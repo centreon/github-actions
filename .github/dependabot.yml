@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # pins of the workflows of this repository and of the shared actions
+  - package-ecosystem: github-actions
+    directories:
+      - "/"
+      - "/pulp/*"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "fix(deps)"
+    labels:
+      - "dependencies"
+      - "gha"

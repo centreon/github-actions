@@ -1,0 +1,57 @@
+name: release
+
+# Maintains the release PR (version bump + CHANGELOG.md) from the conventional
+# commit titles merged on main; merging it tags vX.Y.Z and publishes the release.
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+jobs:
+  release-please:
+    runs-on: ubuntu-24.04
+    # the environment only allows main and holds the release app key
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      # an app token, not GITHUB_TOKEN: the release PR must trigger the required
+      # checks, and the app is the only actor allowed to create release tags
+      - name: Create release app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Summary
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag_name }}
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          {
+            echo "Released \`${TAG_NAME}\` at \`${SHA}\`:"
+            echo
+            echo '```yaml'
+            echo "uses: centreon/github-actions/<path>@${SHA} # ${TAG_NAME}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
