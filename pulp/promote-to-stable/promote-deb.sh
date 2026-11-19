@@ -156,7 +156,7 @@ ensure_legacy_suite_associations() {
         printf 'repository_version=%s&distribution=%s&component=main&limit=1' \
           "$(jq -rn --arg v "$latest" '$v | @uri')" "$(jq -rn --arg v "$STABLE_LEGACY_SUITE" '$v | @uri')"
       )" | jq -r '.results[0].pulp_href // empty'
-  )
+  ) || legacy_rc=""
   if [[ -z "$legacy_rc" ]]; then
     echo "::error::Cannot resolve the $STABLE_LEGACY_SUITE/main release component of $STABLE_LEGACY_REPOSITORY_NAME (provisioned by create-repos)"
     return 1
@@ -358,15 +358,18 @@ if ((${#BATCH_PACKAGES[@]} > 0)); then
   if [[ $(echo "$STABLE_RC_SET" | grep -c .) -ne 1 ]]; then
     refresh_pulp_token
     STABLE_LATEST=$(pulp deb repository show --name "$STABLE_REPOSITORY_NAME" | jq -r '.latest_version_href')
+    # this listing is refused (403) to non-admin identities: a failure must
+    # not abort, the interrupted-promotion recovery below handles it
     STABLE_RC_SET=$(
       curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: Bearer $PULP_TOKEN" \
         "$PULP_URL/$PULP_DOMAIN/api/v3/content/deb/release_components/?$(
           printf 'repository_version=%s&distribution=%s&component=main&limit=1' \
             "$(jq -rn --arg v "$STABLE_LATEST" '$v | @uri')" "$(jq -rn --arg v "$STABLE_SUITE" '$v | @uri')"
         )" | jq -r '.results[0].pulp_href // empty'
-    )
+    ) || STABLE_RC_SET=""
   fi
-  STABLE_RC=$(echo "$STABLE_RC_SET" | grep . | head -1)
+  # first line; a grep on an empty set would abort under pipefail
+  STABLE_RC="${STABLE_RC_SET%%$'\n'*}"
   if [[ -z "$STABLE_RC" ]]; then
     # a promotion interrupted after its repository modify only misses the
     # publication: republish and re-check every candidate before giving up
