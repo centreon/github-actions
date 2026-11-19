@@ -27,21 +27,60 @@ mapfile -t E_BASEPATH   < <(echo "$PACKAGES_JSON" | jq -r '.[].base_path')
 mapfile -t E_SUITE      < <(echo "$PACKAGES_JSON" | jq -r '.[].suite')
 
 # --- physical presence: content units in the repository's latest version ----
-# one lookup per expected package, by sha256 within the repository version: the
-# shared repositories hold 10k+ packages and listing them, even newest first,
-# is slow enough to hit the gateway timeout, which then read as "absent" while
-# the package was published and fetchable. --retry covers those transient 5xx.
 declare -A VERSION_BY_REPO   # repo -> latest_version_href, empty when missing
 for repo in $(printf '%s\n' "${E_REPOSITORY[@]}" | sort -u); do
   VERSION_BY_REPO[$repo]=$(latest_version_href deb "$repo")
   [[ -n "${VERSION_BY_REPO[$repo]}" ]] || echo "[WARN] Repository $repo does not exist or has no version"
 done
 
+# batch lookup: a delivery labels the packages it uploads with its run id, so
+# one filtered listing per repository answers for all of them. Listing the
+# whole repository version instead is not an option: the shared repositories
+# hold 10k+ packages and that listing hits the gateway timeout.
+declare -A BATCH_PRESENT   # "repo|sha256" -> 1
+if [[ "${CHECK_MODE:-delivery}" == "delivery" && -n "${GITHUB_RUN_ID:-}" ]]; then
+  for repo in "${!VERSION_BY_REPO[@]}"; do
+    version_href=${VERSION_BY_REPO[$repo]}
+    [[ -n "$version_href" ]] || continue
+    url="$PULP_URL/$PULP_DOMAIN/api/v3/content/deb/packages/?$(
+      printf 'repository_version=%s&pulp_label_select=%s&fields=sha256&limit=1000' \
+        "$(jq -rn --arg v "$version_href" '$v | @uri')" \
+        "$(jq -rn --arg v "github_run_id=$GITHUB_RUN_ID" '$v | @uri')"
+    )"
+    pages=0
+    found=0
+    while [[ -n "$url" ]] && ((pages < 20)); do
+      refresh_pulp_token
+      page=$(curl -fsSL --retry 3 --retry-delay 5 -H "Authorization: Bearer $PULP_TOKEN" "$url") || {
+        echo "[WARN] presence listing failed for $repo ($url), falling back to one lookup per package" >&2
+        break
+      }
+      while IFS= read -r sha; do
+        BATCH_PRESENT["$repo|$sha"]=1
+        found=$((found + 1))
+      done < <(jq -r '.results[].sha256' <<< "$page")
+      pages=$((pages + 1))
+      url=$(jq -r '.next // empty' <<< "$page")
+    done
+    echo "[INFO] Repository $repo holds $found package(s) delivered by this run in its latest version"
+  done
+fi
+
+# one lookup per package the listing did not return (content that already
+# existed keeps the labels of the run that uploaded it, and a promotion
+# uploads nothing), by sha256 within the repository version. --retry covers
+# transient 5xx, which would otherwise read as "absent".
 declare -A PRESENT_IDX
+lookups=0
 for i in "${!E_FILENAME[@]}"; do
   PRESENT_IDX[$i]=false
   version_href=${VERSION_BY_REPO[${E_REPOSITORY[$i]}]}
   [[ -n "$version_href" ]] || continue
+  if [[ -n "${BATCH_PRESENT["${E_REPOSITORY[$i]}|${E_SHA256[$i]}"]:-}" ]]; then
+    PRESENT_IDX[$i]=true
+    continue
+  fi
+  lookups=$((lookups + 1))
   refresh_pulp_token
   url="$PULP_URL/$PULP_DOMAIN/api/v3/content/deb/packages/?$(
     printf 'repository_version=%s&sha256=%s&fields=pulp_href&limit=1' \
@@ -54,6 +93,7 @@ for i in "${!E_FILENAME[@]}"; do
   }
   [[ "${count:-0}" -gt 0 ]] && PRESENT_IDX[$i]=true
 done
+echo "[INFO] Presence checked for ${#E_FILENAME[@]} package(s), $lookups through a per-package lookup"
 
 # --- metadata resolvability + fetchability, with a bounded retry window -----
 # resolve a package's published Filename from a suite Packages index by sha256
