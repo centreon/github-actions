@@ -41,7 +41,13 @@ case "$url" in
     ;;
   */Release) echo "Architectures: amd64" ;;
   */Packages) cat "${STUB_DIR}/Packages" ;;
-  *) [[ " $* " == *" -I "* ]] && printf '200 %s' "$url" ;;
+  *)
+    if [[ " $* " == *" -I "* ]]; then
+      echo "head" >> "${STUB_DIR}/calls"
+      [[ -n "${UNFETCHABLE:-}" && "$url" == *"${UNFETCHABLE}"* ]] && exit 22
+      printf '200 %s' "$url"
+    fi
+    ;;
 esac
 STUB
   chmod +x "${STUB_DIR}/bin/pulp" "${STUB_DIR}/bin/curl"
@@ -108,4 +114,20 @@ calls() {
   check_deb CHECK_MODE=delivery GITHUB_RUN_ID=42
   [ "$status" -ne 0 ]
   [[ "$output" == *"2/3 present"* ]]
+}
+
+@test "every package is fetched once when the content url answers" {
+  printf '%s\n' "${SHAS[@]}" > "${STUB_DIR}/batch_shas"
+  check_deb CHECK_MODE=delivery GITHUB_RUN_ID=42
+  [ "$status" -eq 0 ]
+  [ "$(calls head)" -eq 3 ]
+}
+
+@test "a package that cannot be fetched is retried, then fails the verification" {
+  printf '%s\n' "${SHAS[@]}" > "${STUB_DIR}/batch_shas"
+  check_deb CHECK_MODE=delivery GITHUB_RUN_ID=42 UNFETCHABLE=pkg1_1.0
+  [ "$status" -ne 0 ]
+  [ "$(calls head)" -eq 5 ]
+  [[ "$output" == *"pkg1_1.0_all.deb"*"fetchable=❌"* ]]
+  [[ "$output" == *"pkg0_1.0_all.deb"*"fetchable=✅"* ]]
 }
