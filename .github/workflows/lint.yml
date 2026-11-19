@@ -16,9 +16,11 @@ env:
   ACTIONLINT_VERSION: "1.7.12"
   ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
   BATS_VERSION: "1.13.0"
+  ZIZMOR_VERSION: "1.32.0"
 
 jobs:
   lint:
+    name: lint
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -47,6 +49,26 @@ jobs:
         run: |
           mapfile -t test_dirs < <(git ls-files '*.bats' | xargs -n 1 dirname | sort -u)
           npx --yes "bats@${BATS_VERSION}" "${test_dirs[@]}"
+
+      # deb feature deliveries are skipped: this runs the action up to the
+      # repository layout, on a real runner, without any Pulp server
+      - name: Smoke test the wiring of pulp/package-delivery
+        # not the $/ form yet: actionlint 1.7.12 rejects it
+        uses: ./pulp/package-delivery # zizmor: ignore[self-repository]
+        with:
+          module_name: smoke-test
+          distrib: bookworm
+          version: "26.10"
+          cache_key: unused
+          stability: unstable
+          is_cloud: "false"
+          delivery_type: feature
+          pulp_url: https://pulp.invalid
+          pulp_content_url: https://pulp.invalid
+          audience: unused
+
+      - name: Zizmor
+        run: pipx run "zizmor==${ZIZMOR_VERSION}" --offline .
 
       - name: Actionlint
         run: |

@@ -27,6 +27,10 @@ Reference an action by its path and the major tag of its package:
 - To freeze a branch, reference an exact release: `@pulp/v1.4.2` (never moved) or its
   commit SHA.
 
+The tag carries the package name because a ref applies to the whole repository: a
+plain `@v1` would give every action the same version, and a breaking change in one
+package would force all the others to a new major.
+
 In the calling repository:
 
 - allow `centreon/github-actions` in the SHA pinning check, as for
@@ -67,6 +71,22 @@ A commit counts for the packages whose directory it changes.
 Nothing reaches the callers before step 3: the release pull request is the moment to
 decide that `main` is good to ship.
 
+### Testing a change before its release
+
+Reference the commit of the pull request from a branch of a calling repository, and
+run the workflow there:
+
+```yaml
+- uses: centreon/github-actions/pulp/package-delivery@<commit-sha>
+```
+
+### Rolling back a release
+
+A release reaches every caller at once. If it breaks them, run the `move-major-tag`
+workflow with the previous release (for example `pulp/v1.4.1`): the major tag points
+back at it within seconds. Then fix or revert on `main`; the next release moves the
+tag forward again.
+
 ## Adding or changing an action
 
 - Put a new action in an existing package when it shares code with it, otherwise create
@@ -75,13 +95,14 @@ decide that `main` is good to ship.
 - An action is self-contained in its package: no `uses: ./...` (that path resolves in
   the caller's workspace) and no path leaving the package. Shared logic lives in
   scripts called through `${{ github.action_path }}`, so all files come from the same
-  release.
+  release, on any runner version.
 - Remote actions are pinned to a full commit SHA with a `# vX.Y.Z` comment.
 - Shell scripts follow shellcheck; test them with
   [bats](https://github.com/bats-core/bats-core) in `<package>/tests/`.
 
-The `lint` workflow enforces all of this on every pull request, with the title format.
-Run it locally with:
+The `lint` workflow enforces all of this on every pull request, with the title format,
+a [zizmor](https://docs.zizmor.sh/) audit and a run of `pulp/package-delivery` up to the
+repository layout. Run the checks locally with:
 
 ```shell
 .github/scripts/check-actions.sh

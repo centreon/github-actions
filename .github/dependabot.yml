@@ -1,12 +1,15 @@
 version: 2
 updates:
-  # pins of the workflows of this repository and of the shared actions
+  # pins of the workflows of this repository and of every shared action
   - package-ecosystem: github-actions
     directories:
       - "/"
-      - "/pulp/*"
+      - "/*"
+      - "/*/*"
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     groups:
       github-actions:

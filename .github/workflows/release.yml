@@ -17,6 +17,7 @@ permissions: {}
 
 jobs:
   release:
+    name: release
     runs-on: ubuntu-24.04
     # the environment only allows main and holds the release app key
     environment: release
