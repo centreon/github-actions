@@ -97,20 +97,13 @@ runs:
         key: ${{ inputs.cache_key }}
         fail-on-cache-miss: true
 
-    - name: Setup python
-      if: steps.pulp-properties.outputs.skip_delivery == 'false'
-      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-      with:
-        python-version: "3.12"
-
     - name: Setup pulp-cli
       if: steps.pulp-properties.outputs.skip_delivery == 'false'
-      shell: bash
-      env:
-        PULP_URL: ${{ inputs.pulp_url }}
-        AUDIENCE: ${{ inputs.audience }}
-        DOMAIN: ${{ steps.pulp-properties.outputs.domain }}
-      run: ${{ github.action_path }}/../setup-cli/setup.sh
+      uses: $/pulp/setup-cli
+      with:
+        pulp_url: ${{ inputs.pulp_url }}
+        audience: ${{ inputs.audience }}
+        domain: ${{ steps.pulp-properties.outputs.domain }}
 
     - name: Ensure the rpm feature repository exists
       if: inputs.delivery_type == 'feature' && steps.pulp-properties.outputs.package_extension == 'rpm' && steps.pulp-properties.outputs.skip_delivery == 'false'

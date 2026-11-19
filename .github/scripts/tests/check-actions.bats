@@ -43,6 +43,28 @@ action() {
   [[ "$output" == *"resolves in the caller's workspace"* ]]
 }
 
+@test "an action of the same package through the self-repository syntax passes" {
+  mkdir -p "${REPO}/tool/setup"
+  cp "${REPO}/tool/run/action.yml" "${REPO}/tool/setup/action.yml"
+  action 'uses: $/tool/setup'
+  run "$SCRIPT" "$REPO"
+  [ "$status" -eq 0 ]
+}
+
+@test "a self-repository reference to another package fails" {
+  action 'uses: $/other/setup'
+  run "$SCRIPT" "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"leaves the package 'tool'"* ]]
+}
+
+@test "a self-repository reference to a missing action fails" {
+  action 'uses: $/tool/missing'
+  run "$SCRIPT" "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"is not an action of this repository"* ]]
+}
+
 @test "a tag-pinned action fails" {
   action 'uses: actions/checkout@v4'
   run "$SCRIPT" "$REPO"

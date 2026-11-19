@@ -8,7 +8,7 @@ inputs:
     description: "OIDC audience, must match the pulp server GITHUB_OIDC.audience"
     required: true
   domain:
-    description: "Pulp Domain to operate in (DOMAIN_ENABLED). Pre-Domains repositories live in \"default\"."
+    description: 'Pulp Domain to operate in (DOMAIN_ENABLED). Pre-Domains repositories live in "default".'
     required: false
     default: "default"
 

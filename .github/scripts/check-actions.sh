@@ -4,7 +4,9 @@
 # - every action belongs to a package declared in release-please-config.json,
 #   whose component is the directory name (it prefixes the release tags);
 # - no local "uses: ./...": it resolves in the caller's workspace, not here;
-# - no path leaving the package: a change there would not release it;
+#   an action of the same package is called with "uses: $/<package>/...";
+# - no path or "$/" reference leaving the package: a change there would not
+#   release it;
 # - every remote action is pinned to a full commit SHA with a version comment.
 # Usage: check-actions.sh [repository root]
 set -euo pipefail
@@ -33,7 +35,15 @@ for action_file in "${action_files[@]}"; do
     ref=${ref#"${ref%%[![:space:]]*}"}
     ref=${ref#[\"\']}
     if [[ "$ref" == ./* ]]; then
-      error "$action_file" "line ${number}: local action '${ref}' resolves in the caller's workspace; call a script through github.action_path instead"
+      error "$action_file" "line ${number}: local action '${ref}' resolves in the caller's workspace; use '\$/${package}/...' instead"
+    elif [[ "$ref" == \$/* ]]; then
+      target=${ref#\$/}
+      target=${target%%[[:space:]\"\']*}
+      if [[ "$target" != "${package}/"* ]]; then
+        error "$action_file" "line ${number}: '${ref}' leaves the package '${package}'"
+      elif [[ ! -f "${target}/action.yml" ]]; then
+        error "$action_file" "line ${number}: '${ref}' is not an action of this repository"
+      fi
     elif [[ ! "$ref" =~ ^[^@[:space:]]+@[0-9a-f]{40}[\"\']?[[:space:]]+#[[:space:]]*v?[0-9]+(\.[0-9]+)*$ ]]; then
       error "$action_file" "line ${number}: '${ref}' must be pinned to a full commit SHA followed by a '# vX.Y.Z' comment"
     fi

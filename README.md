@@ -93,9 +93,10 @@ tag forward again.
   a package: a top-level directory, declared in `release-please-config.json` with its
   directory name as `component`.
 - An action is self-contained in its package: no `uses: ./...` (that path resolves in
-  the caller's workspace) and no path leaving the package. Shared logic lives in
-  scripts called through `${{ github.action_path }}`, so all files come from the same
-  release, on any runner version.
+  the caller's workspace) and nothing referenced outside the package. It calls another
+  action of its package with `uses: $/<package>/<action>` and shared scripts through
+  `${{ github.action_path }}`: both resolve to the commit of the release in use.
+  `$/` needs a runner 2.336.0 or newer.
 - Remote actions are pinned to a full commit SHA with a `# vX.Y.Z` comment.
 - Shell scripts follow shellcheck; test them with
   [bats](https://github.com/bats-core/bats-core) in `<package>/tests/`.
