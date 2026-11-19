@@ -47,8 +47,8 @@ done
 status=200
 case "$url" in
   */dists/*/Release) body="Architectures: all" ;;
-  */dists/testing-suite/*/Packages) body=$(cat "${STUB_DIR}/testing_Packages") ;;
-  */dists/stable-suite/*/Packages) body=$(cat "${STUB_DIR}/stable_Packages") ;;
+  */apt-testing/dists/*/Packages) body=$(cat "${STUB_DIR}/testing_Packages") ;;
+  */apt-stable/dists/*/Packages) body=$(cat "${STUB_DIR}/stable_Packages") ;;
   */pool/*) body="deb" ;;
   */api/v3/repositories/deb/apt/) body='{"count": 1}' ;;
   */content/deb/release_components/\?*)
@@ -135,5 +135,15 @@ STUB
   # the mirror adds the associations to the legacy repository and publishes it
   [ "$(grep -cx "modify" "${STUB_DIR}/calls")" -eq 1 ]
   [ "$(grep -cx "publish" "${STUB_DIR}/calls")" -eq 2 ]
+  ! grep -q "^unexpected" "${STUB_DIR}/calls"
+}
+
+@test "a family whose testing and stable suites share their name needs no listing" {
+  TESTING_SUITE=trixie STABLE_SUITE=trixie run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"Cannot deduce"* ]]
+  ! grep -qx "release_components" "${STUB_DIR}/calls"
+  [ "$(grep -cx "modify" "${STUB_DIR}/calls")" -eq 1 ]
+  [ "$(grep -cx "publish" "${STUB_DIR}/calls")" -eq 1 ]
   ! grep -q "^unexpected" "${STUB_DIR}/calls"
 }
