@@ -4,58 +4,57 @@ Shared GitHub Actions used by Centreon CI workflows.
 
 ## Usage
 
-Reference an action by its path in this repository, pinned to the full commit SHA of a
-release, with the release tag as a comment:
+Reference an action by its path and the floating major tag of that action:
 
 ```yaml
-- uses: centreon/github-actions/pulp/package-delivery@<commit-sha> # v1.2.0
+- uses: centreon/github-actions/pulp/package-delivery@pulp-package-delivery-v1
 ```
 
-- Always pin a SHA, never a tag or a branch: a SHA cannot be moved, and Dependabot
-  reads the `# vX.Y.Z` comment to propose the next release.
-- Use the same release for every action of this repository in a workflow.
-- Each maintained branch of a product repository keeps its own pin: an older branch
-  stays on the release it was validated with until it is bumped on purpose.
+- `<action>-v1` always points at the latest `1.y.z` release of that action: fixes and
+  new optional features reach every branch of every product repository without any
+  change there, including maintained branches.
+- A new major version (`<action>-v2`) is opt-in: move to it by changing the tag, once
+  per branch, after reading its release notes.
+- Pin an exact release only when a branch must not move:
+  `@pulp-package-delivery-v1.4.2` (immutable) or the SHA of that tag.
 
-Let Dependabot bump the pins in one pull request per product repository:
+Keep Dependabot away from these references in the product repositories, their
+updates come from the floating tag:
 
 ```yaml
 # .github/dependabot.yml of the product repository
 - package-ecosystem: github-actions
   directory: "/"
-  schedule:
-    interval: monthly
-  groups:
-    centreon-github-actions:
-      patterns:
-        - "centreon/github-actions*"
+  ignore:
+    - dependency-name: "centreon/github-actions*"
 ```
-
-An urgent fix does not wait for Dependabot: bump the SHA and the comment by hand.
 
 ## Versioning
 
-The repository is released as a whole with [Semantic Versioning](https://semver.org/)
-tags `vX.Y.Z`, each with an immutable GitHub release and an entry in `CHANGELOG.md`.
+Every action has its own [Semantic Versioning](https://semver.org/) version, declared
+in `.github/release-components.json` with the paths it is built from: an action that
+uses `pulp/lib` is released again when `pulp/lib` changes, the others are not.
 
-| Change to any action                                                                           | Pull request title           | Release |
+| Change to an action                                                                            | Pull request title           | Release |
 | ---------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
 | Removed or renamed input/output, new required input, changed default or behavior a caller sees | `feat(pulp)!: …` (or `fix!`) | major   |
-| New action, new optional input or output                                                       | `feat(pulp): …`              | minor   |
+| New optional input or output                                                                   | `feat(pulp): …`              | minor   |
 | Bug fix, pinned dependency bump, internal refactoring                                          | `fix(pulp): …`               | patch   |
 | Documentation, CI of this repository                                                           | `docs: …`, `ci: …`           | none    |
 
-Pull requests are squash-merged, so their title is the commit that decides the release.
+Pull requests are squash-merged with their title as commit title, so the title decides
+the release; the `lint` check rejects a non-conventional title and its summary shows
+the versions the merge will release.
 
-How a release happens:
+Every merge on `main` runs the `release` workflow, which for each action changed since
+its last release:
 
-1. Every merge on `main` updates the release pull request (`chore: release X.Y.Z`),
-   which carries the version bump and the `CHANGELOG.md` entry.
-2. Merging the release pull request creates the `vX.Y.Z` tag and its GitHub release.
-3. The release summary gives the SHA to pin.
+1. creates the immutable `<action>-vX.Y.Z` tag and its GitHub release (commit list and
+   usage line);
+2. moves the floating `<action>-vX` tag to it.
 
-Tags are never moved or deleted, and there is no floating major tag (`v1`): callers pin
-SHAs, so a moving tag would bring nothing but risk.
+A breaking change starts `<action>-v(X+1)` and leaves `<action>-vX` on its last
+release: older majors receive no further fixes.
 
 ## Writing an action
 
@@ -64,6 +63,11 @@ Each action is self-contained: it never calls a sibling action through `uses: ./
 through `${{ github.action_path }}`, so every file comes from the pinned commit. Remote
 actions are pinned to a full SHA with a `# vX.Y.Z` comment. The `lint` workflow checks
 both rules, plus shellcheck and actionlint.
+
+A new action gets a component named after its path (`pulp/setup-cli` ->
+`pulp-setup-cli`) in `.github/release-components.json`, listing its own directory first
+and then every directory it uses through `github.action_path`; the `lint` check fails
+otherwise.
 
 ## Pulp delivery
 
@@ -95,7 +99,7 @@ deliver-pulp:
     contents: read
     id-token: write
   steps:
-    - uses: centreon/github-actions/pulp/package-delivery@<commit-sha> # v1.0.0
+    - uses: centreon/github-actions/pulp/package-delivery@pulp-package-delivery-v1
       with:
         module_name: centreon-web
         distrib: el9
@@ -113,12 +117,14 @@ deliver-pulp:
 
 Kept outside the code, set by a repository admin:
 
-- **Release app**: a GitHub App with `contents`, `pull-requests` and `issues` write
-  access to this repository only; its client id in the `RELEASE_APP_CLIENT_ID` variable
-  and its private key in the `RELEASE_APP_PRIVATE_KEY` secret of the `release`
-  environment.
+- **Release app**: a GitHub App with `contents: write` on this repository only; its
+  client id in the `RELEASE_APP_CLIENT_ID` variable and its private key in the
+  `RELEASE_APP_PRIVATE_KEY` secret of the `release` environment.
 - **`release` environment**: deployment branches limited to `main`.
 - **`Release tags` ruleset**: the release app is the only bypass actor, so no one else
   can create, move or delete a tag.
-- **Immutable releases**: enabled, so a published release and its tag cannot change.
+- **Immutable releases**: enabled, so a published `<action>-vX.Y.Z` release and its tag
+  cannot change (floating tags carry no release and stay movable by the app).
+- **Squash merge commit title**: "Pull request title", so the PR title checked by `lint`
+  is the commit the release reads.
 - **Required status check**: `lint` on `main`.

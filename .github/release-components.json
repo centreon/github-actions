@@ -1,0 +1,16 @@
+{
+  "pulp-package-delivery": [
+    "pulp/package-delivery",
+    "pulp/repository-properties",
+    "pulp/setup-cli",
+    "pulp/lib"
+  ],
+  "pulp-promote-to-stable": [
+    "pulp/promote-to-stable",
+    "pulp/repository-properties",
+    "pulp/setup-cli",
+    "pulp/lib"
+  ],
+  "pulp-repository-properties": ["pulp/repository-properties"],
+  "pulp-setup-cli": ["pulp/setup-cli"]
+}
