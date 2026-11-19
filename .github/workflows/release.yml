@@ -19,6 +19,7 @@ jobs:
   release:
     name: release
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     # the environment only allows main and holds the release app key
     environment: release
     permissions:

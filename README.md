@@ -101,13 +101,16 @@ tag forward again.
   [bats](https://github.com/bats-core/bats-core) in `<package>/tests/`.
 
 The `lint` workflow enforces all of this on every pull request, with the title format,
-a [zizmor](https://docs.zizmor.sh/) audit and a run of `pulp/package-delivery` up to the
-repository layout. Run the checks locally with:
+a run of `pulp/package-delivery` up to the repository layout, and two linters of the
+workflows and actions: [jactionlint](https://jactionlint.jdx.dev) (validity) and
+[zizmor](https://docs.zizmor.sh/) (security). Run the checks locally with:
 
 ```shell
 .github/scripts/check-actions.sh
 shellcheck -x -P SCRIPTDIR $(git ls-files '*.sh')
 npx bats pulp/tests .github/scripts/tests
+uvx jactionlint
+uvx zizmor --offline .
 ```
 
 ## pulp

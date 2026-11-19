@@ -13,8 +13,7 @@ on:
 permissions: {}
 
 env:
-  ACTIONLINT_VERSION: "1.7.12"
-  ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+  JACTIONLINT_VERSION: "2.6.0"
   BATS_VERSION: "1.13.0"
   ZIZMOR_VERSION: "1.32.0"
 
@@ -22,6 +21,7 @@ jobs:
   lint:
     name: lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -53,8 +53,7 @@ jobs:
       # deb feature deliveries are skipped: this runs the action up to the
       # repository layout, on a real runner, without any Pulp server
       - name: Smoke test the wiring of pulp/package-delivery
-        # not the $/ form yet: actionlint 1.7.12 rejects it
-        uses: ./pulp/package-delivery # zizmor: ignore[self-repository]
+        uses: $/pulp/package-delivery
         with:
           module_name: smoke-test
           distrib: bookworm
@@ -70,11 +69,5 @@ jobs:
       - name: Zizmor
         run: pipx run "zizmor==${ZIZMOR_VERSION}" --offline .
 
-      - name: Actionlint
-        run: |
-          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -fsSL --retry 3 -o "${RUNNER_TEMP}/${archive}" \
-            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}"
-          echo "${ACTIONLINT_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict
-          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" actionlint
-          "${RUNNER_TEMP}/actionlint" -color
+      - name: Jactionlint
+        run: pipx run "jactionlint==${JACTIONLINT_VERSION}"
