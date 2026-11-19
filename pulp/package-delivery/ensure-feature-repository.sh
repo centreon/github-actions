@@ -14,11 +14,6 @@ PULP_DOMAIN="${PULP_DOMAIN:-default}"
 MAX_ATTEMPTS=40
 POLL_INTERVAL=15
 
-if [[ -z "${CENTREON_TECHNIQUE_PAT:-}" ]]; then
-  echo "::error::centreon_technique_pat input is required to request the feature repository creation"
-  exit 1
-fi
-
 if [[ -z "${VERSION:-}" ]]; then
   echo "::error::version input is required for a feature delivery"
   exit 1
@@ -44,6 +39,13 @@ feature_repositories_exist() {
 if feature_repositories_exist; then
   echo "[INFO] Feature repositories $REPOSITORY_PREFIX-{noarch,x86_64} already exist in domain $PULP_DOMAIN"
   exit 0
+fi
+
+# only a missing repository needs the token: callers that provision their
+# feature repositories themselves deliver without it
+if [[ -z "${CENTREON_TECHNIQUE_PAT:-}" ]]; then
+  echo "::error::Feature repositories $REPOSITORY_PREFIX-{noarch,x86_64} do not exist in domain $PULP_DOMAIN and the centreon_technique_pat input, required to request their creation, is empty"
+  exit 1
 fi
 
 echo "[INFO] Requesting the creation of the $FEATURE_TICKET feature repositories for $VERSION"

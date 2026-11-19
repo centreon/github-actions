@@ -99,3 +99,19 @@ output_of() {
     grep -qE "^${name}=" "$GITHUB_OUTPUT" || { echo "missing output: ${name}"; return 1; }
   done
 }
+
+@test "24.x stable promotions also target the dedicated legacy repository" {
+  for version in 24.04 24.10; do
+    : > "$GITHUB_OUTPUT"
+    properties MODULE_NAME=web DISTRIB=bookworm STABILITY=stable IS_CLOUD=false VERSION="$version" RELEASE_TYPE=release
+    [ "$status" -eq 0 ]
+    [ "$(output_of stable_legacy_repository_name)" = "apt-standard-${version}-stable" ]
+    [ "$(output_of stable_legacy_suite)" = "bookworm" ]
+  done
+}
+
+@test "later versions have no legacy repository" {
+  properties MODULE_NAME=web DISTRIB=bookworm STABILITY=stable IS_CLOUD=false VERSION=25.10 RELEASE_TYPE=release
+  [ "$status" -eq 0 ]
+  [ -z "$(output_of stable_legacy_repository_name)" ]
+}

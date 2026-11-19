@@ -57,7 +57,12 @@ case "$url" in
     exit 22
     ;;
   */content/deb/package_release_components/)
-    body='{"results": [{"release_component": "/content/release_components/1/"}]}'
+    body='{"pulp_href": "/content/prc/1/", "results": [{"pulp_href": "/content/prc/1/", "release_component": "/content/release_components/1/"}]}'
+    ;;
+  */modify/)
+    echo "modify" >> "${STUB_DIR}/calls"
+    body='{"task": "/tasks/add/"}'
+    status=202
     ;;
   */content/deb/packages/\?*) body=$(jq -sc '{next: null, results: .}' "${STUB_DIR}/listing") ;;
   */content/deb/packages/)
@@ -117,5 +122,18 @@ STUB
   PUBLISH_SERVES=0 run "$SCRIPT"
   [ "$status" -eq 1 ]
   [[ "$output" == *"2 candidate package(s) are missing from the published stable-suite suite"* ]]
+  ! grep -q "^unexpected" "${STUB_DIR}/calls"
+}
+
+@test "a 24.x promotion mirrors into the legacy repository without the admin-only listing" {
+  STABLE_LEGACY_SUITE=trixie STABLE_LEGACY_REPOSITORY_NAME=apt-standard-24.10-stable run "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Release component of apt-standard-24.10-stable trixie/main"* ]]
+  [[ "$output" == *"Mirroring 2 package association(s) into apt-standard-24.10-stable trixie/main"* ]]
+  # only the stable suite lookup of the recovery still tries the listing
+  [ "$(grep -cx "release_components" "${STUB_DIR}/calls")" -eq 1 ]
+  # the mirror adds the associations to the legacy repository and publishes it
+  [ "$(grep -cx "modify" "${STUB_DIR}/calls")" -eq 1 ]
+  [ "$(grep -cx "publish" "${STUB_DIR}/calls")" -eq 2 ]
   ! grep -q "^unexpected" "${STUB_DIR}/calls"
 }

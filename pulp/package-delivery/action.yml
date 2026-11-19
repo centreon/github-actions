@@ -46,7 +46,7 @@ inputs:
     description: "OIDC audience, must match the pulp server GITHUB_OIDC.audience"
     required: true
   centreon_technique_pat:
-    description: "Token used to request the feature repository creation (required when delivery_type is feature)"
+    description: "Token used to request the creation of a missing rpm feature repository"
     required: false
     default: ""
 
