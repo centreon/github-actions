@@ -87,7 +87,7 @@ runs:
         DELIVERY_TYPE: ${{ inputs.delivery_type }}
         REPOSITORY_TYPE: ${{ inputs.repository_name }}
         GH_HEAD_REF: ${{ github.head_ref || github.ref_name }}
-      run: ${{ github.action_path }}/../repository-properties/properties.sh
+      run: ${{ github.action_path }}/../lib/repository-properties.sh
 
     - name: Restore packages from cache
       if: steps.pulp-properties.outputs.skip_delivery == 'false'

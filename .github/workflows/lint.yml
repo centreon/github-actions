@@ -15,8 +15,7 @@ permissions: {}
 env:
   ACTIONLINT_VERSION: "1.7.12"
   ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
-  PYTEST_VERSION: "9.2.0"
-  RUFF_VERSION: "0.17.4"
+  BATS_VERSION: "1.13.0"
 
 jobs:
   lint:
@@ -27,32 +26,27 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-          fetch-tags: true
           persist-credentials: false
 
-      - name: Check actions are self-contained and pinned
-        run: .github/scripts/check-actions.sh
-
-      - name: Preview the releases of this pull request
+      - name: Check the pull request title
         if: github.event_name == 'pull_request'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_REF: ${{ github.base_ref }}
-        run: python3 .github/scripts/release.py plan --title "$PR_TITLE" --base "origin/${BASE_REF}"
+        run: .github/scripts/check-pr-title.sh "$PR_TITLE"
 
-      - name: Test the release script
-        run: |
-          pipx run "ruff==${RUFF_VERSION}" check .github/scripts
-          pipx run "ruff==${RUFF_VERSION}" format --check .github/scripts
-          cd .github/scripts
-          pipx run --spec "pytest==${PYTEST_VERSION}" pytest -q -p no:cacheprovider
+      - name: Check actions are packaged, self-contained and pinned
+        run: .github/scripts/check-actions.sh
 
       - name: Shellcheck
         run: |
           mapfile -t scripts < <(git ls-files '*.sh')
           shellcheck --version
           shellcheck -x -P SCRIPTDIR -S warning "${scripts[@]}"
+
+      - name: Bats tests
+        run: |
+          mapfile -t test_dirs < <(git ls-files '*.bats' | xargs -n 1 dirname | sort -u)
+          npx --yes "bats@${BATS_VERSION}" "${test_dirs[@]}"
 
       - name: Actionlint
         run: |

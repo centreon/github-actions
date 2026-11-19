@@ -1,7 +1,8 @@
 name: release
 
-# Releases every action changed on main as <action>-vX.Y.Z (immutable, with a
-# GitHub release) and moves its floating <action>-vX tag; see the README.
+# release-please keeps one release pull request per package (version bump and
+# CHANGELOG.md); merging it creates the <package>/vX.Y.Z tag and its GitHub
+# release, then the floating <package>/vX tag is moved to it. See the README.
 
 concurrency:
   group: ${{ github.workflow }}
@@ -11,7 +12,6 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 permissions: {}
 
@@ -23,7 +23,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      # the release app is the only actor allowed to create and move tags
+      # an app token, not GITHUB_TOKEN: the release pull requests must trigger
+      # the required checks, and the app is the only actor allowed to push tags
       - name: Create release app token
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -31,15 +32,26 @@ jobs:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
           permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
       - name: Checkout sources
+        if: steps.release.outputs.releases_created == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-          fetch-tags: true
           persist-credentials: false
 
-      - name: Release changed actions
+      - name: Move floating major tags
+        if: steps.release.outputs.releases_created == 'true'
         env:
+          RELEASES: ${{ toJSON(steps.release.outputs) }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 .github/scripts/release.py release
+        run: .github/scripts/update-major-tags.sh

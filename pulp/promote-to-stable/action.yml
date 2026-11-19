@@ -65,7 +65,7 @@ runs:
         IS_CLOUD: ${{ inputs.is_cloud }}
         REPOSITORY_TYPE: ${{ inputs.repository_name }}
         GH_HEAD_REF: ${{ github.head_ref || github.ref_name }}
-      run: ${{ github.action_path }}/../repository-properties/properties.sh
+      run: ${{ github.action_path }}/../lib/repository-properties.sh
 
     - name: Setup python
       uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

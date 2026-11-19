@@ -2,82 +2,105 @@
 
 Shared GitHub Actions used by Centreon CI workflows.
 
+The repository is a set of **packages**: a package is a top-level directory, versioned
+and released on its own, that holds one action or several actions built on the same
+code.
+
+| Package         | Actions                                                             |
+| --------------- | ------------------------------------------------------------------- |
+| [`pulp`](#pulp) | `pulp/package-delivery`, `pulp/promote-to-stable`, `pulp/setup-cli` |
+
 ## Usage
 
-Reference an action by its path and the floating major tag of that action:
+Reference an action by its path and the major tag of its package:
 
 ```yaml
-- uses: centreon/github-actions/pulp/package-delivery@pulp-package-delivery-v1
+- uses: centreon/github-actions/pulp/package-delivery@pulp/v1
 ```
 
-- `<action>-v1` always points at the latest `1.y.z` release of that action: fixes and
-  new optional features reach every branch of every product repository without any
-  change there, including maintained branches.
-- A new major version (`<action>-v2`) is opt-in: move to it by changing the tag, once
-  per branch, after reading its release notes.
-- Pin an exact release only when a branch must not move:
-  `@pulp-package-delivery-v1.4.2` (immutable) or the SHA of that tag.
+- `<package>/v1` always points at the latest `1.y.z` release of the package: fixes and
+  new optional features reach every branch of every repository without any change
+  there.
+- A new major (`<package>/v2`) is opt-in: change the tag, branch by branch, after
+  reading its release notes. The previous major stays where it was and gets no
+  further release.
+- To freeze a branch, reference an exact release: `@pulp/v1.4.2` (never moved) or its
+  commit SHA.
 
-Keep Dependabot away from these references in the product repositories, their
-updates come from the floating tag:
+In the calling repository:
 
-```yaml
-# .github/dependabot.yml of the product repository
-- package-ecosystem: github-actions
-  directory: "/"
-  ignore:
-    - dependency-name: "centreon/github-actions*"
-```
+- allow `centreon/github-actions` in the SHA pinning check, as for
+  `centreon/security-tools`;
+- make Dependabot ignore it, the major tag already brings the updates:
 
-## Versioning
+  ```yaml
+  # .github/dependabot.yml
+  - package-ecosystem: github-actions
+    directory: "/"
+    ignore:
+      - dependency-name: "centreon/github-actions*"
+  ```
 
-Every action has its own [Semantic Versioning](https://semver.org/) version, declared
-in `.github/release-components.json` with the paths it is built from: an action that
-uses `pulp/lib` is released again when `pulp/lib` changes, the others are not.
+## Versioning and releases
 
-| Change to an action                                                                            | Pull request title           | Release |
+Each package follows [Semantic Versioning](https://semver.org/). Releases are made by
+[release-please](https://github.com/googleapis/release-please) from the titles of the
+pull requests merged on `main` (squash merge, so the title is the commit):
+
+| Change to a package                                                                            | Pull request title           | Release |
 | ---------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
 | Removed or renamed input/output, new required input, changed default or behavior a caller sees | `feat(pulp)!: …` (or `fix!`) | major   |
-| New optional input or output                                                                   | `feat(pulp): …`              | minor   |
-| Bug fix, pinned dependency bump, internal refactoring                                          | `fix(pulp): …`               | patch   |
-| Documentation, CI of this repository                                                           | `docs: …`, `ci: …`           | none    |
+| New action, new optional input or output                                                       | `feat(pulp): …`              | minor   |
+| Bug fix, pinned dependency bump, performance                                                   | `fix(pulp): …`, `perf: …`    | patch   |
+| Refactoring, documentation, tests, CI                                                          | `refactor:`, `docs:`, `ci:`… | none    |
 
-Pull requests are squash-merged with their title as commit title, so the title decides
-the release; the `lint` check rejects a non-conventional title and its summary shows
-the versions the merge will release.
+A commit counts for the packages whose directory it changes.
 
-Every merge on `main` runs the `release` workflow, which for each action changed since
-its last release:
+1. A pull request with a releasing title is merged on `main`.
+2. release-please opens, or updates, the release pull request of each changed package
+   (`chore(main): release pulp 1.2.0`): version bump and `<package>/CHANGELOG.md`.
+   Several changes can accumulate in it.
+3. Merging the release pull request creates the `<package>/v1.2.0` tag and its GitHub
+   release, then moves the floating `<package>/v1` tag to it: callers get the release
+   on their next run.
 
-1. creates the immutable `<action>-vX.Y.Z` tag and its GitHub release (commit list and
-   usage line);
-2. moves the floating `<action>-vX` tag to it.
+Nothing reaches the callers before step 3: the release pull request is the moment to
+decide that `main` is good to ship.
 
-A breaking change starts `<action>-v(X+1)` and leaves `<action>-vX` on its last
-release: older majors receive no further fixes.
+## Adding or changing an action
 
-## Writing an action
+- Put a new action in an existing package when it shares code with it, otherwise create
+  a package: a top-level directory, declared in `release-please-config.json` with its
+  directory name as `component`.
+- An action is self-contained in its package: no `uses: ./...` (that path resolves in
+  the caller's workspace) and no path leaving the package. Shared logic lives in
+  scripts called through `${{ github.action_path }}`, so all files come from the same
+  release.
+- Remote actions are pinned to a full commit SHA with a `# vX.Y.Z` comment.
+- Shell scripts follow shellcheck; test them with
+  [bats](https://github.com/bats-core/bats-core) in `<package>/tests/`.
 
-Each action is self-contained: it never calls a sibling action through `uses: ./...`
-(that path resolves in the caller's workspace). Shared logic lives in scripts called
-through `${{ github.action_path }}`, so every file comes from the pinned commit. Remote
-actions are pinned to a full SHA with a `# vX.Y.Z` comment. The `lint` workflow checks
-both rules, plus shellcheck and actionlint.
+The `lint` workflow enforces all of this on every pull request, with the title format.
+Run it locally with:
 
-A new action gets a component named after its path (`pulp/setup-cli` ->
-`pulp-setup-cli`) in `.github/release-components.json`, listing its own directory first
-and then every directory it uses through `github.action_path`; the `lint` check fails
-otherwise.
+```shell
+.github/scripts/check-actions.sh
+shellcheck -x -P SCRIPTDIR $(git ls-files '*.sh')
+npx bats pulp/tests .github/scripts/tests
+```
 
-## Pulp delivery
+## pulp
 
-| Action                       | Purpose                                                                                       |
-| ---------------------------- | --------------------------------------------------------------------------------------------- |
-| `pulp/package-delivery`      | Deliver rpm/deb packages from the actions cache to an unstable, testing or feature repository |
-| `pulp/promote-to-stable`     | Promote testing packages to the stable repository                                             |
-| `pulp/repository-properties` | Compute repository names, base paths, suites and domains of a delivery                        |
-| `pulp/setup-cli`             | Install pulp-cli and authenticate with a GitHub OIDC token                                    |
-| `pulp/lib`                   | Shell helpers (REST api, manifest, post-delivery checks), not an action                       |
+Delivery of rpm/deb packages to the Pulp repositories.
+
+| Action                   | Purpose                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `pulp/package-delivery`  | Deliver rpm/deb packages from the actions cache to an unstable, testing or feature repository |
+| `pulp/promote-to-stable` | Promote testing packages to the stable repository                                             |
+| `pulp/setup-cli`         | Install pulp-cli and authenticate with a GitHub OIDC token                                    |
+
+`pulp/lib` holds their shared scripts (repository layout, REST api, manifest,
+post-delivery checks); it is not an action.
 
 Requirements of the calling job:
 
@@ -90,8 +113,6 @@ Requirements of the calling job:
 `repository_name` selects the repository family: `standard`, `standard-internal`,
 `business`, `business-internal`, `plugins` or `connectors`.
 
-Example:
-
 ```yaml
 deliver-pulp:
   runs-on: centreon-ubuntu-26.04-small
@@ -99,7 +120,7 @@ deliver-pulp:
     contents: read
     id-token: write
   steps:
-    - uses: centreon/github-actions/pulp/package-delivery@pulp-package-delivery-v1
+    - uses: centreon/github-actions/pulp/package-delivery@pulp/v1
       with:
         module_name: centreon-web
         distrib: el9
@@ -117,14 +138,15 @@ deliver-pulp:
 
 Kept outside the code, set by a repository admin:
 
-- **Release app**: a GitHub App with `contents: write` on this repository only; its
-  client id in the `RELEASE_APP_CLIENT_ID` variable and its private key in the
-  `RELEASE_APP_PRIVATE_KEY` secret of the `release` environment.
+- **Release app**: a GitHub App installed on this repository only, with `contents`,
+  `pull-requests` and `issues` write access; its client id in the
+  `RELEASE_APP_CLIENT_ID` variable and its private key in the `RELEASE_APP_PRIVATE_KEY`
+  secret of the `release` environment.
 - **`release` environment**: deployment branches limited to `main`.
 - **`Release tags` ruleset**: the release app is the only bypass actor, so no one else
   can create, move or delete a tag.
-- **Immutable releases**: enabled, so a published `<action>-vX.Y.Z` release and its tag
+- **Immutable releases**: enabled, so a published `<package>/vX.Y.Z` release and its tag
   cannot change (floating tags carry no release and stay movable by the app).
-- **Squash merge commit title**: "Pull request title", so the PR title checked by `lint`
-  is the commit the release reads.
+- **Squash merge commit title**: "Pull request title", so the title checked by `lint`
+  is the commit release-please reads.
 - **Required status check**: `lint` on `main`.

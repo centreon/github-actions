@@ -1,12 +1,25 @@
 #!/usr/bin/env bash
+# Compute the pulp repository names, base paths, suites and domains of a
+# delivery, as step outputs. Inputs (env): MODULE_NAME, DISTRIB, STABILITY,
+# IS_CLOUD, and optionally VERSION, RELEASE_TYPE, DELIVERY_TYPE,
+# REPOSITORY_TYPE, GH_HEAD_REF.
 set -euo pipefail
+
+MODULE_NAME="${MODULE_NAME:-}"
+DISTRIB="${DISTRIB:-}"
+STABILITY="${STABILITY:-}"
+IS_CLOUD="${IS_CLOUD:-}"
+VERSION="${VERSION:-}"
+RELEASE_TYPE="${RELEASE_TYPE:-}"
+DELIVERY_TYPE="${DELIVERY_TYPE:-standard}"
+GH_HEAD_REF="${GH_HEAD_REF:-}"
 
 if [[ -z "$MODULE_NAME" || -z "$DISTRIB" || -z "$STABILITY" || -z "$IS_CLOUD" ]]; then
   echo "::error::some mandatory inputs are empty, please check the logs."
   exit 1
 fi
 
-# shellcheck source=pulp/repository-properties/parse-distrib.sh
+# shellcheck source=pulp/lib/parse-distrib.sh
 source "$(dirname "$0")/parse-distrib.sh"
 
 # repository_name selects the standard (open-source), business (paid) or plugins
