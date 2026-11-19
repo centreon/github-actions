@@ -13,6 +13,15 @@ on:
 
 permissions: {}
 
+# shared with release: tags are never moved by two runs at once
+concurrency:
+  group: release-tags
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   move-major-tag:
     name: move-major-tag

@@ -5,6 +5,8 @@ setup() {
   REPO="${BATS_TEST_TMPDIR}/repo"
   mkdir -p "${REPO}/tool/run" "${REPO}/tool/lib"
   echo '{"packages": {"tool": {"component": "tool"}}}' > "${REPO}/release-please-config.json"
+  printf '#!/bin/sh\n' > "${REPO}/tool/lib/run.sh"
+  chmod +x "${REPO}/tool/lib/run.sh"
   action 'uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5' \
     'run: ${{ github.action_path }}/../lib/run.sh'
 }
@@ -84,4 +86,18 @@ action() {
   run "$SCRIPT" "$REPO"
   [ "$status" -ne 0 ]
   [[ "$output" == *"package 'ghost' holds no action.yml"* ]]
+}
+
+@test "a script that does not exist fails" {
+  action 'run: ${{ github.action_path }}/missing.sh'
+  run "$SCRIPT" "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"script 'missing.sh' does not exist"* ]]
+}
+
+@test "a script that is not executable fails" {
+  chmod -x "${REPO}/tool/lib/run.sh"
+  run "$SCRIPT" "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"is not executable"* ]]
 }

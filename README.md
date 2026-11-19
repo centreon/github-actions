@@ -51,12 +51,16 @@ Each package follows [Semantic Versioning](https://semver.org/). Releases are ma
 [release-please](https://github.com/googleapis/release-please) from the titles of the
 pull requests merged on `main` (squash merge, so the title is the commit):
 
-| Change to a package                                                                            | Pull request title           | Release |
-| ---------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
-| Removed or renamed input/output, new required input, changed default or behavior a caller sees | `feat(pulp)!: …` (or `fix!`) | major   |
-| New action, new optional input or output                                                       | `feat(pulp): …`              | minor   |
-| Bug fix, pinned dependency bump, performance                                                   | `fix(pulp): …`, `perf: …`    | patch   |
-| Refactoring, documentation, tests, CI                                                          | `refactor:`, `docs:`, `ci:`… | none    |
+| Change to a package                                                                            | Pull request title                  | Release |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------- | ------- |
+| Removed or renamed input/output, new required input, changed default or behavior a caller sees | `feat(pulp)!: …` (or `fix!`)        | major   |
+| New action, new optional input or output                                                       | `feat(pulp): …`                     | minor   |
+| Bug fix, pinned dependency bump, performance, refactoring, revert                              | `fix`, `perf`, `refactor`, `revert` | patch   |
+| Documentation, tests, CI, chores                                                               | `docs`, `test`, `ci`, `chore`       | none    |
+
+Anything that changes what an action runs needs a releasing type, or callers never get
+it: `docs`, `test`, `ci` and `chore` changes to a package only ship with its next
+release.
 
 A commit counts for the packages whose directory it changes.
 
@@ -86,6 +90,9 @@ A release reaches every caller at once. If it breaks them, run the `move-major-t
 workflow with the previous release (for example `pulp/v1.4.1`): the major tag points
 back at it within seconds. Then fix or revert on `main`; the next release moves the
 tag forward again.
+
+The same workflow repairs a release whose tag was created but whose major tag was not
+moved (a failed `release` run): give it the new release.
 
 ## Adding or changing an action
 
@@ -164,9 +171,9 @@ deliver-pulp:
 Kept outside the code, set by a repository admin:
 
 - **Release app**: a GitHub App installed on this repository only, with `contents`,
-  `pull-requests` and `issues` write access; its client id in the
-  `RELEASE_APP_CLIENT_ID` variable and its private key in the `RELEASE_APP_PRIVATE_KEY`
-  secret of the `release` environment.
+  `pull-requests` and `issues` write access; its client id in the `RELEASE_APP_CLIENT_ID`
+  repository variable and its private key in the `RELEASE_APP_PRIVATE_KEY` secret of the
+  `release` environment. The `release` workflow does nothing until the variable is set.
 - **`release` environment**: deployment branches limited to `main`.
 - **`Release tags` ruleset**: the release app is the only bypass actor, so no one else
   can create, move or delete a tag.

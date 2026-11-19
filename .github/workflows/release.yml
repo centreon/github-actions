@@ -4,8 +4,9 @@ name: release
 # CHANGELOG.md); merging it creates the <package>/vX.Y.Z tag and its GitHub
 # release, then the floating <package>/vX tag is moved to it. See the README.
 
+# shared with move-major-tag: tags are never moved by two runs at once
 concurrency:
-  group: ${{ github.workflow }}
+  group: release-tags
   cancel-in-progress: false
 
 on:
@@ -15,9 +16,15 @@ on:
 
 permissions: {}
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   release:
     name: release
+    # nothing to do until the release app is configured (see the README)
+    if: vars.RELEASE_APP_CLIENT_ID != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # the environment only allows main and holds the release app key

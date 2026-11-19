@@ -7,6 +7,7 @@
 #   an action of the same package is called with "uses: $/<package>/...";
 # - no path or "$/" reference leaving the package: a change there would not
 #   release it;
+# - every script an action runs exists and is executable;
 # - every remote action is pinned to a full commit SHA with a version comment.
 # Usage: check-actions.sh [repository root]
 set -euo pipefail
@@ -48,6 +49,15 @@ for action_file in "${action_files[@]}"; do
       error "$action_file" "line ${number}: '${ref}' must be pinned to a full commit SHA followed by a '# vX.Y.Z' comment"
     fi
   done < <(grep -nE '^[[:space:]-]*uses:' "$action_file" || true)
+
+  while IFS= read -r script; do
+    script_path="${action_file%/*}/${script}"
+    if [[ ! -f "$script_path" ]]; then
+      error "$action_file" "script '${script}' does not exist"
+    elif [[ ! -x "$script_path" ]]; then
+      error "$action_file" "script '${script}' is not executable"
+    fi
+  done < <(grep -oE 'github\.action_path \}\}/[^[:space:]"]+' "$action_file" | sed 's|^github\.action_path }}/||' | sort -u || true)
 done
 
 while IFS= read -r package; do

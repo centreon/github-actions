@@ -7,14 +7,24 @@
 # Environment: GITHUB_REPOSITORY, GH_TOKEN.
 set -euo pipefail
 
+RELEASE_TAG_PATTERN='^([a-z0-9][a-z0-9-]*)/v([0-9]+)\.[0-9]+\.[0-9]+$'
+
+# print the major tag of a release tag, fail on anything else
+major_tag_of() {
+  if [[ ! "$1" =~ $RELEASE_TAG_PATTERN ]]; then
+    echo "::error::'$1' is not a release tag (<package>/vX.Y.Z)" >&2
+    return 1
+  fi
+  echo "${BASH_REMATCH[1]}/v${BASH_REMATCH[2]}"
+}
+
 move_major_tag() {
   local tag=$1 sha=$2 major_tag
-  if [[ ! "$sha" =~ ^[0-9a-f]{40}$ || ! "$tag" =~ ^(.+)/v([0-9]+)\.[0-9]+\.[0-9]+$ ]]; then
-    echo "::error::unexpected release: tag '${tag}', sha '${sha}'"
-    exit 1
+  major_tag=$(major_tag_of "$tag")
+  if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "::error::unexpected commit '${sha}' for the release ${tag}"
+    return 1
   fi
-  # BASH_REMATCH holds the tag match: it is the last regex evaluated above
-  major_tag="${BASH_REMATCH[1]}/v${BASH_REMATCH[2]}"
 
   if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${major_tag}" > /dev/null 2>&1; then
     gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${major_tag}" -f "sha=${sha}" -F force=true > /dev/null
@@ -27,6 +37,8 @@ move_major_tag() {
 
 if (($# > 0)); then
   for tag in "$@"; do
+    # validated before it reaches an api path: the tag is typed by a person
+    major_tag_of "$tag" > /dev/null
     if ! sha=$(gh api "repos/${GITHUB_REPOSITORY}/commits/tags/${tag}" --jq .sha); then
       echo "::error::release tag '${tag}' does not exist"
       exit 1

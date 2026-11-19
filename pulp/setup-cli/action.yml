@@ -1,4 +1,4 @@
-name: "setup-pulp-cli"
+name: "Pulp setup-cli"
 description: "Install pulp-cli and authenticate to pulp with a GitHub OIDC token"
 inputs:
   pulp_url:

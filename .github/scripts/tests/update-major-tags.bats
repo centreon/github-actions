@@ -71,8 +71,10 @@ releases() {
   ! grep -qE -- "-X (PATCH|POST)" "$GH_CALLS"
 }
 
-@test "rollback: a major tag is not a release tag" {
-  run "$SCRIPT" pulp/v1
-  [ "$status" -ne 0 ]
-  ! grep -qE -- "-X (PATCH|POST)" "$GH_CALLS"
+@test "rollback: anything but a release tag is refused before any api call" {
+  for tag in pulp/v1 v1.0.0 "pulp/v1.0.0/../../x" "../pulp/v1.0.0" "Pulp/v1.0.0"; do
+    run "$SCRIPT" "$tag"
+    [ "$status" -ne 0 ] || { echo "accepted: ${tag}"; return 1; }
+  done
+  [ ! -s "$GH_CALLS" ]
 }

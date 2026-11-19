@@ -1,5 +1,5 @@
-name: "promote testing to stable"
-description: "Promote testing packages to stable."
+name: "Pulp promote to stable"
+description: "Promote testing packages to the stable pulp repository"
 inputs:
   module_name:
     description: "Module name"

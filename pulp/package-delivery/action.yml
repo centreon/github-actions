@@ -1,4 +1,4 @@
-name: "package-delivery"
+name: "Pulp package delivery"
 description: "Deliver rpm and deb packages to pulp"
 inputs:
   module_name:

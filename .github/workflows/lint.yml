@@ -12,6 +12,10 @@ on:
 
 permissions: {}
 
+defaults:
+  run:
+    shell: bash
+
 env:
   JACTIONLINT_VERSION: "2.6.0"
   BATS_VERSION: "1.13.0"
