@@ -6,7 +6,6 @@ rules:
       "centreon/security-tools/*": ref-pin
 
 # names the workflows may read: a typo in vars.* or secrets.* is an error
-config-variables:
-  - RELEASE_APP_CLIENT_ID
+config-variables: []
 config-secrets:
-  - RELEASE_APP_PRIVATE_KEY
+  - CENTREON_TECHNIQUE_PAT

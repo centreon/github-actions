@@ -25,21 +25,13 @@ defaults:
 jobs:
   move-major-tag:
     name: move-major-tag
+    # the workflow of another branch could move a tag to anything
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    # the environment only allows main and holds the release app key
-    environment: release
     permissions:
       contents: read
     steps:
-      - name: Create release app token
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
-
       - name: Checkout sources
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,5 +40,5 @@ jobs:
       - name: Move the major tag
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
         run: .github/scripts/update-major-tags.sh "$RELEASE_TAG"

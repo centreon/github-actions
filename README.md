@@ -170,15 +170,12 @@ deliver-pulp:
 
 Kept outside the code, set by a repository admin:
 
-- **Release app**: a GitHub App installed on this repository only, with `contents`,
-  `pull-requests` and `issues` write access; its client id in the `RELEASE_APP_CLIENT_ID`
-  repository variable and its private key in the `RELEASE_APP_PRIVATE_KEY` secret of the
-  `release` environment. The `release` workflow does nothing until the variable is set.
-- **`release` environment**: deployment branches limited to `main`.
-- **`Release tags` ruleset**: the release app is the only bypass actor, so no one else
-  can create, move or delete a tag.
+- **Release token**: the `CENTREON_TECHNIQUE_PAT` organization secret, shared with this
+  repository. The `release` workflow does nothing until it is.
+- **`Release tags` ruleset**: only the technical account of that token (through its
+  role or team) bypasses it, so no one else can create, move or delete a tag.
 - **Immutable releases**: enabled, so a published `<package>/vX.Y.Z` release and its tag
-  cannot change (floating tags carry no release and stay movable by the app).
+  cannot change (floating tags carry no release and stay movable by that account).
 - **Squash merge commit title**: "Pull request title", so the title checked by `lint`
   is the commit release-please reads.
 - **Required status check**: `lint` on `main`.
