@@ -12,7 +12,7 @@ concurrency:
 on:
   push:
     branches:
-      - main
+      - mon-215510-test-release
 
 permissions: {}
 
@@ -44,6 +44,7 @@ jobs:
         with:
           token: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
           config-file: release-please-config.json
+          target-branch: mon-215510-test-release
           manifest-file: .release-please-manifest.json
 
       - name: Checkout sources

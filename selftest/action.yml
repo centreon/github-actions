@@ -1,0 +1,8 @@
+name: "Release selftest"
+description: "Throwaway action of a release test, safe to remove"
+runs:
+  using: "composite"
+  steps:
+    - name: Say hello
+      shell: bash
+      run: echo "selftest 1"
