@@ -1,0 +1,60 @@
+name: release
+
+# release-please keeps one release pull request per package (version bump and
+# CHANGELOG.md); merging it creates the <package>/vX.Y.Z tag and its GitHub
+# release, then the floating <package>/vX tag is moved to it. See the README.
+
+# shared with move-major-tag: tags are never moved by two runs at once
+concurrency:
+  group: release-tags
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # nothing to do until the token is shared with this repository (see the README)
+      HAS_TOKEN: ${{ secrets.CENTREON_TECHNIQUE_PAT != '' }}
+    steps:
+      - name: Report the missing token
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::notice::CENTREON_TECHNIQUE_PAT is not available to this repository, release skipped"
+
+      # the technical account token, not GITHUB_TOKEN: the release pull requests
+      # must trigger the required checks, and tags are restricted by a ruleset
+      - name: Run release-please
+        id: release
+        if: env.HAS_TOKEN == 'true'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Checkout sources
+        if: steps.release.outputs.releases_created == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Move floating major tags
+        if: steps.release.outputs.releases_created == 'true'
+        env:
+          RELEASES: ${{ toJSON(steps.release.outputs) }}
+          GH_TOKEN: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
+        run: .github/scripts/update-major-tags.sh

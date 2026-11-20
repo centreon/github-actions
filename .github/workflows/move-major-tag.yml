@@ -1,0 +1,44 @@
+name: move-major-tag
+
+# Roll a floating major tag back (or forward) to an existing release of its
+# package, without waiting for a new release. See the README.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release the major tag must point at, e.g. pulp/v1.4.1"
+        required: true
+        type: string
+
+permissions: {}
+
+# shared with release: tags are never moved by two runs at once
+concurrency:
+  group: release-tags
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  move-major-tag:
+    name: move-major-tag
+    # the workflow of another branch could move a tag to anything
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Move the major tag
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_TOKEN: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
+        run: .github/scripts/update-major-tags.sh "$RELEASE_TAG"

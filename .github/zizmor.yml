@@ -1,0 +1,7 @@
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        # security workflows are synchronized from security-tools, pinned to its main branch
+        "centreon/security-tools/*": ref-pin
+        "*": hash-pin

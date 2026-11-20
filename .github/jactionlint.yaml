@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/jdx/jactionlint/main/schema/jactionlint-config.json
+rules:
+  unpinned-uses:
+    policies:
+      # security workflows are synchronized from security-tools, pinned to its main branch
+      "centreon/security-tools/*": ref-pin
+
+# names the workflows may read: a typo in vars.* or secrets.* is an error
+config-variables: []
+config-secrets:
+  - CENTREON_TECHNIQUE_PAT
