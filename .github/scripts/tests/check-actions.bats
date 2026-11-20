@@ -5,6 +5,7 @@ setup() {
   REPO="${BATS_TEST_TMPDIR}/repo"
   mkdir -p "${REPO}/tool/run" "${REPO}/tool/lib"
   echo '{"packages": {"tool": {"component": "tool"}}}' > "${REPO}/release-please-config.json"
+  echo "# tool" > "${REPO}/tool/README.md"
   printf '#!/bin/sh\n' > "${REPO}/tool/lib/run.sh"
   chmod +x "${REPO}/tool/lib/run.sh"
   action 'uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5' \
@@ -100,4 +101,11 @@ action() {
   run "$SCRIPT" "$REPO"
   [ "$status" -ne 0 ]
   [[ "$output" == *"is not executable"* ]]
+}
+
+@test "a package without README fails" {
+  rm "${REPO}/tool/README.md"
+  run "$SCRIPT" "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"package 'tool' has no README.md"* ]]
 }

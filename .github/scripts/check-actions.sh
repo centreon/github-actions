@@ -3,6 +3,7 @@
 # released on its own by release-please; it holds one or several actions.
 # - every action belongs to a package declared in release-please-config.json,
 #   whose component is the directory name (it prefixes the release tags);
+# - every package documents its actions in a README.md;
 # - no local "uses: ./...": it resolves in the caller's workspace, not here;
 #   an action of the same package is called with "uses: $/<package>/...";
 # - no path or "$/" reference leaving the package: a change there would not
@@ -64,6 +65,9 @@ while IFS= read -r package; do
   if [[ -z "$(find "$package" -name action.yml 2> /dev/null)" ]]; then
     error "$CONFIG" "package '${package}' holds no action.yml"
     continue
+  fi
+  if [[ ! -f "${package}/README.md" ]]; then
+    error "$CONFIG" "package '${package}' has no README.md documenting its actions"
   fi
   while IFS= read -r file; do
     directory=${file%/*}

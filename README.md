@@ -4,11 +4,11 @@ Shared GitHub Actions used by Centreon CI workflows.
 
 The repository is a set of **packages**: a package is a top-level directory, versioned
 and released on its own, that holds one action or several actions built on the same
-code.
+code. Each package documents its actions in its own `README.md`.
 
-| Package         | Actions                                                             |
-| --------------- | ------------------------------------------------------------------- |
-| [`pulp`](#pulp) | `pulp/package-delivery`, `pulp/promote-to-stable`, `pulp/setup-cli` |
+| Package                  | Actions                                                             |
+| ------------------------ | ------------------------------------------------------------------- |
+| [`pulp`](pulp/README.md) | `pulp/package-delivery`, `pulp/promote-to-stable`, `pulp/setup-cli` |
 
 ## Usage
 
@@ -97,8 +97,9 @@ moved (a failed `release` run): give it the new release.
 ## Adding or changing an action
 
 - Put a new action in an existing package when it shares code with it, otherwise create
-  a package: a top-level directory, declared in `release-please-config.json` with its
-  directory name as `component`.
+  a package: a top-level directory with a `README.md`, declared in
+  `release-please-config.json` with its directory name as `component`, and listed in
+  the table above.
 - An action is self-contained in its package: no `uses: ./...` (that path resolves in
   the caller's workspace) and nothing referenced outside the package. It calls another
   action of its package with `uses: $/<package>/<action>` and shared scripts through
@@ -116,66 +117,25 @@ workflows and actions: [jactionlint](https://jactionlint.jdx.dev) (validity) and
 ```shell
 .github/scripts/check-actions.sh
 shellcheck -x -P SCRIPTDIR $(git ls-files '*.sh')
-npx bats pulp/tests .github/scripts/tests
+npx bats $(git ls-files '*.bats' | xargs -n 1 dirname | sort -u)
 uvx jactionlint
 uvx zizmor --offline .
 ```
 
-## pulp
-
-Delivery of rpm/deb packages to the Pulp repositories.
-
-| Action                   | Purpose                                                                                       |
-| ------------------------ | --------------------------------------------------------------------------------------------- |
-| `pulp/package-delivery`  | Deliver rpm/deb packages from the actions cache to an unstable, testing or feature repository |
-| `pulp/promote-to-stable` | Promote testing packages to the stable repository                                             |
-| `pulp/setup-cli`         | Install pulp-cli and authenticate with a GitHub OIDC token                                    |
-
-`pulp/lib` holds their shared scripts (repository layout, REST api, manifest,
-post-delivery checks); it is not an action.
-
-Requirements of the calling job:
-
-- `permissions: id-token: write` (OIDC authentication to Pulp).
-- An internal runner: the Pulp api is not reachable from GitHub-hosted runners.
-- An OIDC rule for the calling repository in the Pulp configuration.
-- Inputs `pulp_url`, `pulp_content_url` and `audience` wired from the `PULP_API_URL`,
-  `PULP_CONTENT_URL` and `PULP_OIDC_AUDIENCE` organization variables.
-
-`repository_name` selects the repository family: `standard`, `standard-internal`,
-`business`, `business-internal`, `plugins` or `connectors`.
-
-```yaml
-deliver-pulp:
-  runs-on: centreon-ubuntu-26.04-small
-  permissions:
-    contents: read
-    id-token: write
-  steps:
-    - uses: centreon/github-actions/pulp/package-delivery@pulp/v1
-      with:
-        module_name: centreon-web
-        distrib: el9
-        version: "26.10"
-        cache_key: ${{ github.sha }}-${{ github.run_id }}-rpm-el9
-        stability: testing
-        release_type: release
-        is_cloud: "false"
-        pulp_url: ${{ vars.PULP_API_URL }}
-        pulp_content_url: ${{ vars.PULP_CONTENT_URL }}
-        audience: ${{ vars.PULP_OIDC_AUDIENCE }}
-```
-
 ## Repository settings
 
-Kept outside the code, set by a repository admin:
+The settings of this repository are code too, in
+[centreon/Github](https://github.com/centreon/Github) (`repos/centreon/github_actions.tf`);
+change them there, not in the GitHub interface.
 
-- **Release token**: the `CENTREON_TECHNIQUE_PAT` organization secret, shared with this
-  repository. The `release` workflow does nothing until it is.
-- **`Release tags` ruleset**: only the technical account of that token (through its
-  role or team) bypasses it, so no one else can create, move or delete a tag.
-- **Immutable releases**: enabled, so a published `<package>/vX.Y.Z` release and its tag
-  cannot change (floating tags carry no release and stay movable by that account).
-- **Squash merge commit title**: "Pull request title", so the title checked by `lint`
+- **Release token**: the `CENTREON_TECHNIQUE_PAT` organization secret is shared with this
+  repository; the `release` workflow does nothing without it. It belongs to the
+  `technique-ci` account, which opens the release pull requests and pushes the tags.
+- **`Release tags` ruleset**: only `technique-ci` and the organization admins may create,
+  move or delete a tag.
+- **Squash merge commit title**: the pull request title, so the title checked by `lint`
   is the commit release-please reads.
 - **Required status check**: `lint` on `main`.
+- **Immutable releases** (set by hand, not managed as code): a published
+  `<package>/vX.Y.Z` release and its tag cannot change; the floating tags carry no
+  release and stay movable.
