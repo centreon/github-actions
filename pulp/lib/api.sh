@@ -114,7 +114,8 @@ pulp_upload() {
 # - lost repository-version race: concurrent legs of a SHARED deb repository
 #   collide on the version bookkeeping (duplicate (repository_id, number)
 #   insert, or the retention cleanup deleting a version another transaction
-#   still references)
+#   still references; the latter surfaces as "RepositoryVersion matching
+#   query does not exist")
 # - "Worker has gone missing": the task worker pod was terminated mid-task
 #   (scale-down, node consolidation)
 # Re-running the operation converges, so callers retry on rc 2.
@@ -143,7 +144,7 @@ wait_task_race() {
         ;;
       failed | canceled)
         error=$(echo "$body" | jq -c '.error // empty' 2>/dev/null) || error=""
-        if echo "$error" | grep -qE 'core_repositoryversion|Worker has gone missing'; then
+        if echo "$error" | grep -qE 'core_repositoryversion|Worker has gone missing|RepositoryVersion matching query does not exist'; then
           return 2
         fi
         # the "gone missing" reason lands in a separate field on some tasks
@@ -352,7 +353,7 @@ create_publication() {
   fi
   # outer retry: the publication task itself can die server-side for
   # retryable reasons (task worker terminated mid-task, version race)
-  for outer in 1 2 3; do
+  for outer in 1 2 3 4 5; do
     task=""
     for attempt in 1 2 3; do
       refresh_pulp_token
@@ -381,9 +382,10 @@ create_publication() {
     wait_task_race "$task" && rc=0 || rc=$?
     if [[ $rc -eq 0 ]]; then
       return 0
-    elif [[ $rc -eq 2 && $outer -lt 3 ]]; then
+    elif [[ $rc -eq 2 && $outer -lt 5 ]]; then
       echo "[WARN] Publication of $repository was interrupted server-side, retrying"
-      sleep $((outer * 15))
+      # jitter: concurrent legs of a shared repository must not retry in step
+      sleep $((outer * 15 + RANDOM % 15))
     else
       echo "::error::Publication of repository $repository failed"
       return 1

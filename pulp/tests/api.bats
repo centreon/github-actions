@@ -54,6 +54,12 @@ states() {
   [ "$status" -eq 2 ]
 }
 
+@test "a version removed by a concurrent delivery is reported as retryable" {
+  states '{"state": "failed", "error": {"description": "RepositoryVersion matching query does not exist."}}'
+  wait_task
+  [ "$status" -eq 2 ]
+}
+
 @test "a task whose worker went missing is reported as retryable" {
   states '{"state": "canceled", "reason": "Worker has gone missing"}'
   wait_task
