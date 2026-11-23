@@ -67,10 +67,10 @@ if [[ "${CHECK_MODE:-delivery}" == "delivery" && -n "${GITHUB_RUN_ID:-}" ]]; the
 fi
 
 # one lookup per package the listing did not return, CHECK_MAX_PARALLEL at a
-# time (content that already
-# existed keeps the labels of the run that uploaded it, and a promotion
-# uploads nothing), by sha256 within the repository version. --retry covers
-# transient 5xx, which would otherwise read as "absent".
+# time, by sha256 within the repository version (content that already existed
+# keeps the labels of the run that uploaded it, and a promotion uploads
+# nothing). --retry covers transient 5xx, which would otherwise read as
+# "absent".
 declare -A PRESENT_IDX
 PRESENCE_DIR=$(mktemp -d)
 lookups=0

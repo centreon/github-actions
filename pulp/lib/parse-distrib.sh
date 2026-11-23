@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sourced by properties.sh: sets DISTRIB_FAMILY, PACKAGE_EXTENSION,
+# Sourced by repository-properties.sh: sets DISTRIB_FAMILY, PACKAGE_EXTENSION,
 # PACKAGE_DISTRIB_NAME and PACKAGE_DISTRIB_SEPARATOR from DISTRIB.
 
 case "$DISTRIB" in

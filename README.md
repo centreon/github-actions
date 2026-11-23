@@ -116,7 +116,7 @@ workflows and actions: [jactionlint](https://jactionlint.jdx.dev) (validity) and
 
 ```shell
 .github/scripts/check-actions.sh
-shellcheck -x -P SCRIPTDIR $(git ls-files '*.sh')
+shellcheck -x -P SCRIPTDIR -S warning $(git ls-files '*.sh')
 npx bats $(git ls-files '*.bats' | xargs -n 1 dirname | sort -u)
 uvx jactionlint
 uvx zizmor --offline .
@@ -128,9 +128,12 @@ The settings of this repository are code too, in
 [centreon/Github](https://github.com/centreon/Github) (`repos/centreon/github_actions.tf`);
 change them there, not in the GitHub interface.
 
-- **Release token**: the `CENTREON_TECHNIQUE_PAT` organization secret is shared with this
-  repository; the `release` workflow does nothing without it. It belongs to the
-  `technique-ci` account, which opens the release pull requests and pushes the tags.
+- **Release token**: the token of the `technique-ci` account, which opens the release
+  pull requests and pushes the tags, is the `CENTREON_TECHNIQUE_PAT` secret of the
+  `release` environment. Only `main` may use that environment, so the workflow of another
+  branch never receives the token. Its value is set by hand on the environment, and the
+  organization secret of the same name must not be shared with this repository. The
+  `release` workflow does nothing without it.
 - **`Release tags` ruleset**: only `technique-ci` and the organization admins may create,
   move or delete a tag.
 - **Squash merge commit title**: the pull request title, so the title checked by `lint`
