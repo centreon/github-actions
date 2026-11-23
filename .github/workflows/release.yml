@@ -23,7 +23,7 @@ defaults:
 jobs:
   release:
     name: release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     # the release token only exists in this environment, which only main may use:
     # the workflow of another branch never receives it

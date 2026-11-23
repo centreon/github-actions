@@ -29,7 +29,7 @@ jobs:
     # from the workflow of another branch
     if: github.ref == 'refs/heads/main'
     environment: release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
