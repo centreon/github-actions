@@ -1,0 +1,29 @@
+name: "Pulp setup-cli"
+description: "Install pulp-cli and authenticate to pulp with a GitHub OIDC token"
+inputs:
+  pulp_url:
+    description: "The pulp server api url"
+    required: true
+  audience:
+    description: "OIDC audience, must match the pulp server GITHUB_OIDC.audience"
+    required: true
+  domain:
+    description: 'Pulp Domain to operate in (DOMAIN_ENABLED). Pre-Domains repositories live in "default".'
+    required: false
+    default: "default"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup python
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      with:
+        python-version: "3.12"
+
+    - name: Setup pulp-cli
+      shell: bash
+      env:
+        PULP_URL: ${{ inputs.pulp_url }}
+        AUDIENCE: ${{ inputs.audience }}
+        DOMAIN: ${{ inputs.domain }}
+      run: ${{ github.action_path }}/setup.sh

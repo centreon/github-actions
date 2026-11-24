@@ -1,0 +1,68 @@
+name: release
+
+# release-please keeps one release pull request per package (version bump and
+# CHANGELOG.md); merging it creates the <package>/vX.Y.Z tag and its GitHub
+# release, then the floating <package>/vX tag is moved to it. See the README.
+
+# shared with move-major-tag: tags are never moved by two runs at once
+concurrency:
+  group: release-tags
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    # the release token only exists in this environment, which only main may use:
+    # the workflow of another branch never receives it
+    environment: release
+    permissions:
+      contents: read
+    steps:
+      # nothing to do until the token is set on the environment (see the README)
+      - name: Check the release token
+        id: token
+        env:
+          TOKEN: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
+        run: |
+          if [[ -n "$TOKEN" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::CENTREON_TECHNIQUE_PAT is not set on the release environment, release skipped"
+          fi
+
+      # the technical account token, not GITHUB_TOKEN: the release pull requests
+      # must trigger the required checks, and tags are restricted by a ruleset
+      - name: Run release-please
+        id: release
+        if: steps.token.outputs.available == 'true'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - name: Checkout sources
+        if: steps.release.outputs.releases_created == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Move floating major tags
+        if: steps.release.outputs.releases_created == 'true'
+        env:
+          RELEASES: ${{ toJSON(steps.release.outputs) }}
+          GH_TOKEN: ${{ secrets.CENTREON_TECHNIQUE_PAT }}
+        run: .github/scripts/update-major-tags.sh

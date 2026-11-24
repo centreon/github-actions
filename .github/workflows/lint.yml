@@ -1,0 +1,78 @@
+name: lint
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    # edited: the title decides the release, re-check it when it changes
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  JACTIONLINT_VERSION: "2.6.0"
+  BATS_VERSION: "1.13.0"
+  ZIZMOR_VERSION: "1.32.0"
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: .github/scripts/check-pr-title.sh "$PR_TITLE"
+
+      - name: Check actions are packaged, self-contained and pinned
+        run: .github/scripts/check-actions.sh
+
+      - name: Shellcheck
+        run: |
+          mapfile -t scripts < <(git ls-files '*.sh')
+          shellcheck --version
+          shellcheck -x -P SCRIPTDIR -S warning "${scripts[@]}"
+
+      - name: Bats tests
+        run: |
+          mapfile -t test_dirs < <(git ls-files '*.bats' | xargs -n 1 dirname | sort -u)
+          npx --yes "bats@${BATS_VERSION}" "${test_dirs[@]}"
+
+      # deb feature deliveries are skipped: this runs the action up to the
+      # repository layout, on a real runner, without any Pulp server.
+      # Local path, not "$/": the code scanner reads "$/" as an unpinned third-party action
+      - name: Smoke test the wiring of pulp/package-delivery
+        uses: ./pulp/package-delivery # zizmor: ignore[self-repository]
+        with:
+          module_name: smoke-test
+          distrib: bookworm
+          version: "26.10"
+          cache_key: unused
+          stability: unstable
+          is_cloud: "false"
+          delivery_type: feature
+          pulp_url: https://pulp.invalid
+          pulp_content_url: https://pulp.invalid
+          audience: unused
+
+      - name: Zizmor
+        run: pipx run "zizmor==${ZIZMOR_VERSION}" --offline .
+
+      - name: Jactionlint
+        run: pipx run "jactionlint==${JACTIONLINT_VERSION}"
