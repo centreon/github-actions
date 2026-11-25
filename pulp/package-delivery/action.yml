@@ -12,11 +12,16 @@ inputs:
     required: false
     default: ""
   cache_key:
-    description: "The cached package key"
-    required: true
+    description: "The cached package key; leave empty when the packages are already in the working directory"
+    required: false
+    default: ""
   stability:
-    description: "The package stability (stable, testing, unstable)"
+    description: "The package stability (testing, unstable; stable only with allow_stable)"
     required: true
+  allow_stable:
+    description: "Accept a delivery straight to stable, which still refuses a version already published there"
+    required: false
+    default: "false"
   release_type:
     description: "Type of release (hotfix, release)"
     required: false
@@ -66,13 +71,8 @@ runs:
       env:
         STABILITY: ${{ inputs.stability }}
         DELIVERY_TYPE: ${{ inputs.delivery_type }}
-      run: |
-        set -euo pipefail
-
-        if [[ "$DELIVERY_TYPE" != "feature" && "$STABILITY" != "testing" && "$STABILITY" != "unstable" ]]; then
-          echo "::error::stability must be one of: testing, unstable (got '$STABILITY')"
-          exit 1
-        fi
+        ALLOW_STABLE: ${{ inputs.allow_stable }}
+      run: ${{ github.action_path }}/validate-inputs.sh
 
     - name: Compute pulp repository properties
       id: pulp-properties
@@ -89,8 +89,18 @@ runs:
         GH_HEAD_REF: ${{ github.head_ref || github.ref_name }}
       run: ${{ github.action_path }}/../lib/repository-properties.sh
 
+    # the legacy stable repositories are only fed by a promotion
+    - name: Refuse a stable delivery to a legacy repository
+      if: inputs.stability == 'stable' && steps.pulp-properties.outputs.stable_legacy_repository_name != ''
+      shell: bash
+      env:
+        STABLE_LEGACY_REPOSITORY_NAME: ${{ steps.pulp-properties.outputs.stable_legacy_repository_name }}
+      run: |
+        echo "::error::$STABLE_LEGACY_REPOSITORY_NAME is only fed by a promotion: deliver to testing and promote instead"
+        exit 1
+
     - name: Restore packages from cache
-      if: steps.pulp-properties.outputs.skip_delivery == 'false'
+      if: inputs.cache_key != '' && steps.pulp-properties.outputs.skip_delivery == 'false'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ./*.${{ steps.pulp-properties.outputs.package_extension }}

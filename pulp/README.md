@@ -49,7 +49,8 @@ deliver-pulp:
 ```
 
 - The packages come from the actions cache entry `cache_key`, saved by the packaging
-  job as `./*.rpm` or `./*.deb`.
+  job as `./*.rpm` or `./*.deb`. Without `cache_key`, the action delivers the packages
+  already present in the working directory.
 - `repository_name` selects the repository family: `standard` (default),
   `standard-internal`, `business`, `business-internal`, `plugins` or `connectors`.
   `plugins` and `connectors` are not versioned: leave `version` empty.
@@ -57,6 +58,10 @@ deliver-pulp:
   the testing repository.
 - A testing delivery of a package version already published in stable is refused: bump
   the version.
+- `stability: stable` with `allow_stable: "true"` delivers straight to the stable
+  repository, to add packages missing from an already released version. It needs an
+  OIDC rule of its own, refuses a version already published in stable, and does not
+  feed the 24.04 and 24.10 legacy stable repositories.
 - `delivery_type: feature` delivers rpm packages to the repositories of the ticket
   found in the branch name (`MON-12345-...`). When they do not exist yet,
   `centreon_technique_pat` is needed to request their creation. deb feature deliveries
