@@ -55,10 +55,9 @@ jobs:
           npx --yes "bats@${BATS_VERSION}" "${test_dirs[@]}"
 
       # deb feature deliveries are skipped: this runs the action up to the
-      # repository layout, on a real runner, without any Pulp server.
-      # Local path, not "$/": the code scanner reads "$/" as an unpinned third-party action
+      # repository layout, on a real runner, without any Pulp server
       - name: Smoke test the wiring of pulp/package-delivery
-        uses: ./pulp/package-delivery # zizmor: ignore[self-repository]
+        uses: $/pulp/package-delivery
         with:
           module_name: smoke-test
           distrib: bookworm
