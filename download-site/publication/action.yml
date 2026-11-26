@@ -1,0 +1,121 @@
+name: "Download site publication"
+description: "Commit release entries to the download site repository and open a pull request"
+inputs:
+  entries_file:
+    description: "TSV file of release entries, one per line (see the README)"
+    required: true
+  branch:
+    description: "Branch to create, or to complete, in the site repository"
+    required: true
+  commit_message:
+    description: "Commit message"
+    required: true
+  pr_title:
+    description: "Pull request title"
+    required: true
+  github_token:
+    description: "Token with contents and pull-requests write access on the site repository"
+    required: true
+  webapp_repo:
+    description: "Site repository, as owner/name"
+    required: true
+  webapp_base:
+    description: "Base branch of the site repository"
+    required: false
+    default: "develop"
+  out_name:
+    description: "Release YAML filename, e.g. 26.10.3.yaml. Required unless every entry carries its own"
+    required: false
+    default: ""
+  pr_body_file:
+    description: "File holding the pull request body (generated when empty)"
+    required: false
+    default: ""
+  pr_label:
+    description: "Label to apply to the pull request, empty to skip"
+    required: false
+    default: "release"
+  agent_version:
+    description: "Monitoring agent version to feature on the Agent tab, with the three inputs below"
+    required: false
+    default: ""
+  agent_file_url:
+    description: "Url of the windows installer of that version"
+    required: false
+    default: ""
+  agent_md5:
+    description: "md5 of that installer"
+    required: false
+    default: ""
+  agent_size:
+    description: "Size of that installer, in bytes"
+    required: false
+    default: ""
+  sidecar:
+    description: 'Set to "true" to also upload a YAML sidecar next to each artifact that has an s3_uri'
+    required: false
+    default: "false"
+  dry_run:
+    description: 'Set to "true" to validate everything without pushing or opening a pull request'
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check the inputs
+      shell: bash
+      env:
+        WEBAPP_REPO: ${{ inputs.webapp_repo }}
+        SIDECAR: ${{ inputs.sidecar }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: |
+        [[ "$WEBAPP_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
+          || { echo "::error::the webapp_repo input must name the site repository as owner/name"; exit 1; }
+        for name in SIDECAR DRY_RUN; do
+          [[ "${!name}" == "true" || "${!name}" == "false" ]] \
+            || { echo "::error::the ${name,,} input must be 'true' or 'false'"; exit 1; }
+        done
+
+    - name: Setup node
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+
+    # The site's validator runs before the push and needs its exact packageManager pnpm: any
+    # other version self-switches to it, and that download can fail the trust policy.
+    - name: Read the site repository's pnpm version
+      id: pnpm-version
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        WEBAPP_REPO: ${{ inputs.webapp_repo }}
+        WEBAPP_BASE: ${{ inputs.webapp_base }}
+      run: ${{ github.action_path }}/pnpm-version.sh
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      with:
+        version: ${{ steps.pnpm-version.outputs.version }}
+        run_install: false
+
+    - name: Publish release metadata
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        WEBAPP_REPO: ${{ inputs.webapp_repo }}
+        WEBAPP_BASE: ${{ inputs.webapp_base }}
+        PDR_ENTRIES: ${{ inputs.entries_file }}
+        PDR_OUT_NAME: ${{ inputs.out_name }}
+        PDR_BRANCH: ${{ inputs.branch }}
+        PDR_COMMIT_MESSAGE: ${{ inputs.commit_message }}
+        PDR_PR_TITLE: ${{ inputs.pr_title }}
+        PDR_PR_BODY_FILE: ${{ inputs.pr_body_file }}
+        PDR_PR_LABEL: ${{ inputs.pr_label }}
+        PDR_AGENT_VERSION: ${{ inputs.agent_version }}
+        PDR_AGENT_FILE_URL: ${{ inputs.agent_file_url }}
+        PDR_AGENT_MD5: ${{ inputs.agent_md5 }}
+        PDR_AGENT_SIZE: ${{ inputs.agent_size }}
+        PDR_SIDECAR: ${{ inputs.sidecar }}
+        PDR_DRY_RUN: ${{ inputs.dry_run }}
+      run: ${{ github.action_path }}/run.sh

@@ -2,7 +2,7 @@
 # Source tarball and upload destination of the sources delivery, with a stand-in aws.
 
 setup() {
-  SCRIPT="${BATS_TEST_DIRNAME}/../delivery/deliver.sh"
+  SCRIPT="${BATS_TEST_DIRNAME}/../sources-delivery/deliver.sh"
   WORK="${BATS_TEST_TMPDIR}/work"
   mkdir -p "${BATS_TEST_TMPDIR}/bin" "${WORK}/gorgone/docs"
   echo "content" > "${WORK}/gorgone/README.md"
