@@ -30,6 +30,7 @@ deliver-sources:
 - Archives `module_directory` as `<module_name>-<major_version>.<minor_version>.tar.gz`,
   whose single top-level directory carries the same name, and uploads it to
   `public/<bucket_directory>/` in the bucket, readable by anyone.
+- The `.git` directory of an archived checkout is left out of the tarball.
 - The directory is renamed in the workspace: run the action last in its job, or on a
   checkout nothing else needs.
 - The job needs the aws cli credentials that may write to the bucket; they come from

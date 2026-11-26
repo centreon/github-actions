@@ -42,7 +42,8 @@ if [[ "$(realpath "$MODULE_DIRECTORY")" != "$(realpath -m "$ARCHIVE_ROOT")" ]]; 
   [[ ! -e "$ARCHIVE_ROOT" ]] || fail "'${ARCHIVE_ROOT}' already exists in the workspace"
   mv "$MODULE_DIRECTORY" "$ARCHIVE_ROOT"
 fi
-tar czf "$SRC_FILE" "$ARCHIVE_ROOT"
+# an archived checkout ships its files, not its git metadata
+tar czf "$SRC_FILE" --exclude="${ARCHIVE_ROOT}/.git" "$ARCHIVE_ROOT"
 echo "[INFO] Built ${SRC_FILE} ($(du -h "$SRC_FILE" | cut -f1))"
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then

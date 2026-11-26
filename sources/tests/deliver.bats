@@ -120,3 +120,19 @@ deliver() {
   [[ "$output" == *"centreon-web-26.10.3/file"* ]]
   grep -q "s3://centreon-download/public/centreon/centreon-web-26.10.3.tar.gz" "${BATS_TEST_TMPDIR}/aws.calls"
 }
+
+@test "a whole checkout is archived without its git metadata" {
+  mkdir -p checkout/.git checkout/.github/workflows checkout/src/.git
+  echo "[core]" > checkout/.git/config
+  echo "name: ci" > checkout/.github/workflows/ci.yml
+  echo "code" > checkout/src/main.c
+  echo "nested" > checkout/src/.git/keep
+  deliver MODULE_NAME=centreon-collect MODULE_DIRECTORY=checkout BUCKET_DIRECTORY=centreon-collect
+  [ "$status" -eq 0 ]
+  run tar tzf centreon-collect-26.10.3.tar.gz
+  [[ "$output" != *"centreon-collect-26.10.3/.git/"* ]]
+  [[ "$output" == *"centreon-collect-26.10.3/.github/workflows/ci.yml"* ]]
+  [[ "$output" == *"centreon-collect-26.10.3/src/main.c"* ]]
+  # only the metadata of the archived directory itself is left out
+  [[ "$output" == *"centreon-collect-26.10.3/src/.git/keep"* ]]
+}
