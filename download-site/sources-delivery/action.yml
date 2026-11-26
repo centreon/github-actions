@@ -1,0 +1,114 @@
+name: "Sources delivery"
+description: "Build the source tarball of a module and upload it to the download site bucket"
+inputs:
+  bucket_directory:
+    description: "Directory of the module in the bucket, under public/"
+    required: true
+  module_directory:
+    description: "Directory of the workspace to archive"
+    required: true
+  module_name:
+    description: "Module name, the tarball is <module_name>-<major_version>.<minor_version>.tar.gz"
+    required: true
+  major_version:
+    description: "The major version"
+    required: true
+  minor_version:
+    description: "The minor version"
+    required: true
+  frontend_index_cache_key:
+    description: "Cache key of the built index.html, restored before archiving when set with frontend_index_file"
+    required: false
+    default: ""
+  frontend_index_file:
+    description: "The index.html file path"
+    required: false
+    default: ""
+  frontend_static_cache_key:
+    description: "Cache key of the built static directory, restored when set with frontend_static_directory"
+    required: false
+    default: ""
+  frontend_static_directory:
+    description: "The static directory"
+    required: false
+    default: ""
+  backend_vendor_cache_key:
+    description: "Cache key of the vendor directory, restored when set with backend_vendor_directory"
+    required: false
+    default: ""
+  backend_vendor_directory:
+    description: "The vendor directory"
+    required: false
+    default: ""
+  translation_cache_key:
+    description: "Cache key of the translation directory, restored when set with translation_directory"
+    required: false
+    default: ""
+  translation_directory:
+    description: "The translation directory"
+    required: false
+    default: ""
+  bucket:
+    description: "Bucket of the download site"
+    required: false
+    default: "centreon-download"
+  dry_run:
+    description: 'Set to "true" to build the tarball without uploading it'
+    required: false
+    default: "false"
+
+outputs:
+  source_file:
+    description: "Name of the tarball built in the workspace"
+    value: ${{ steps.deliver.outputs.source_file }}
+  destination:
+    description: "Object the tarball is uploaded to"
+    value: ${{ steps.deliver.outputs.destination }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Restore index file cache
+      if: inputs.frontend_index_file != '' && inputs.frontend_index_cache_key != ''
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.frontend_index_file }}
+        key: ${{ inputs.frontend_index_cache_key }}
+        fail-on-cache-miss: true
+
+    - name: Restore static directory cache
+      if: inputs.frontend_static_directory != '' && inputs.frontend_static_cache_key != ''
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.frontend_static_directory }}
+        key: ${{ inputs.frontend_static_cache_key }}
+        fail-on-cache-miss: true
+
+    - name: Restore vendor directory cache
+      if: inputs.backend_vendor_directory != '' && inputs.backend_vendor_cache_key != ''
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.backend_vendor_directory }}
+        key: ${{ inputs.backend_vendor_cache_key }}
+        fail-on-cache-miss: true
+
+    - name: Restore translation directory cache
+      if: inputs.translation_directory != '' && inputs.translation_cache_key != ''
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.translation_directory }}
+        key: ${{ inputs.translation_cache_key }}
+        fail-on-cache-miss: true
+
+    - name: Deliver sources
+      id: deliver
+      shell: bash
+      env:
+        MODULE_NAME: ${{ inputs.module_name }}
+        MODULE_DIRECTORY: ${{ inputs.module_directory }}
+        BUCKET_DIRECTORY: ${{ inputs.bucket_directory }}
+        MAJOR_VERSION: ${{ inputs.major_version }}
+        MINOR_VERSION: ${{ inputs.minor_version }}
+        BUCKET: ${{ inputs.bucket }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: ${{ github.action_path }}/deliver.sh

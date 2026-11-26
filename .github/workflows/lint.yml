@@ -75,3 +75,25 @@ jobs:
 
       - name: Jactionlint
         run: pipx run "jactionlint==${JACTIONLINT_VERSION}"
+
+      # dry run: builds a tarball on a real runner and uploads nothing. Last step:
+      # the action renames the archived directory in the workspace
+      - name: Smoke test the wiring of download-site/sources-delivery
+        id: sources-smoke
+        uses: $/download-site/sources-delivery
+        with:
+          bucket_directory: smoke-test
+          module_directory: download-site
+          module_name: smoke-test
+          major_version: "1.0"
+          minor_version: "0"
+          dry_run: "true"
+
+      - name: Check the smoke-tested tarball
+        env:
+          SOURCE_FILE: ${{ steps.sources-smoke.outputs.source_file }}
+          DESTINATION: ${{ steps.sources-smoke.outputs.destination }}
+        run: |
+          [[ "$SOURCE_FILE" == "smoke-test-1.0.0.tar.gz" && -f "$SOURCE_FILE" ]]
+          [[ "$DESTINATION" == "s3://centreon-download/public/smoke-test/smoke-test-1.0.0.tar.gz" ]]
+          tar tzf "$SOURCE_FILE" | grep -q "^smoke-test-1.0.0/sources-delivery/action.yml$"
