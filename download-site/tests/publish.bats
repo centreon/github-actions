@@ -383,7 +383,16 @@ STUB
   publish --entries "$ENTRIES" --out-name x.yaml --branch release/cma --commit-message m --pr-title t --dry-run \
     --agent-version 27.04.0 --agent-file-url https://example.invalid/a.exe --agent-md5 "$MD5_A" --agent-size 5000
   [ "$status" -eq 0 ]
-  [[ "$output" == *"3 featured entries, review before merging"* ]]
+  [[ "$output" == *"3 featured entries, one more than before: review before merging"* ]]
+}
+
+@test "an agent build of a featured train is not flagged" {
+  entry centreon-monitoring-agent 26.10 stable "" 26.10.2 a.exe 2026-11-26 "$MD5_A" 5000 > "$ENTRIES"
+  publish --entries "$ENTRIES" --out-name x.yaml --branch release/cma --commit-message m --pr-title t --dry-run \
+    --agent-version 26.10.2 --agent-file-url https://example.invalid/a.exe --agent-md5 "$MD5_A" --agent-size 5000
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Agent catalog | catalog.yaml 26.10.2: all_versions: inserted, downloads: replaced 26.10.1 |"* ]]
+  [[ "$output" != *"review before merging"* ]]
 }
 
 # ---- sidecars -------------------------------------------------------------------

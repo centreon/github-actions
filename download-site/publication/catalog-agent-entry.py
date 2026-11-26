@@ -140,6 +140,8 @@ def main():
 
     new_entry = render_entry(args.version, args.file_url, args.md5, args.size)
     changed = []
+    start, stop = find_windows_target(lines)
+    _, featured_before = find_list(lines, start, stop, "downloads")
 
     # all_versions first: editing the lower list would shift the indices of the upper one
     for name, same_train_only in (("all_versions", False), ("downloads", True)):
@@ -181,18 +183,22 @@ def main():
 
     print(f"catalog.yaml {args.version}: " + ", ".join(changed))
 
-    # The Agent tab shows one featured button per supported train, two today. A new train adds
-    # a third rather than silently dropping someone's release: say so loudly instead, and let
-    # the reviewer of the pull request decide which train stops being featured.
+    # The Agent tab shows one featured button per supported train. A build of a train that
+    # is not featured yet adds a button rather than silently dropping someone's release: say
+    # so loudly, and let the reviewer of the pull request decide which train stops being
+    # featured. A build of an already featured train changes no count and needs no warning.
     start, stop = find_windows_target(lines)
     _, featured = find_list(lines, start, stop, "downloads")
-    if len(featured) != 2:
+    added = len(featured) > len(featured_before)
+    if added:
         print(
             f"::warning::agent.targets[windows].downloads now has {len(featured)} featured "
-            f"entries ({', '.join(version_of(lines[i]) or '?' for i in featured)}). The Agent tab "
-            "features one build per supported train - decide which trains belong there before merging."
+            f"entries ({', '.join(version_of(lines[i]) or '?' for i in featured)}), one more than "
+            "before. The Agent tab features one build per supported train - decide which trains "
+            "belong there before merging."
         )
     print(f"featured_count={len(featured)}")
+    print(f"featured_added={'true' if added else 'false'}")
 
 
 if __name__ == "__main__":

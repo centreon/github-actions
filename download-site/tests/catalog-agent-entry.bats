@@ -101,6 +101,17 @@ list() {
   [[ "$output" == *"downloads: inserted"* ]]
   [[ "$output" == *"::warning::"*"3 featured entries"* ]]
   [[ "$output" == *"featured_count=3"* ]]
+  [[ "$output" == *"featured_added=true"* ]]
+}
+
+@test "a build of a featured train raises no warning, whatever the number of trains" {
+  edit --version 27.04.0
+  edit --version 27.04.1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"downloads: replaced 27.04.0"* ]]
+  [[ "$output" != *"::warning::"* ]]
+  [[ "$output" == *"featured_count=3"* ]]
+  [[ "$output" == *"featured_added=false"* ]]
 }
 
 @test "malformed values are rejected and the file is left alone" {

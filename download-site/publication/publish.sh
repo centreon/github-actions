@@ -494,11 +494,12 @@ if [[ -n "$AGENT_VERSION" ]]; then
     die "could not update the agent block of $catalog_rel"
   fi
   cat "$agent_out"
-  catalog_line="$(grep -v '^featured_count=' "$agent_out" | head -1)"
+  catalog_line="$(grep -v -e '^featured_count=' -e '^featured_added=' -e '^::warning::' "$agent_out" | head -1)"
   featured_count="$(sed -n 's/^featured_count=//p' "$agent_out" | head -1)"
-  # the tab features one build per supported train; a third entry is a site change, not a release
-  if [[ -n "$featured_count" && "$featured_count" != "2" ]]; then
-    catalog_line="$catalog_line — **$featured_count featured entries, review before merging**"
+  featured_added="$(sed -n 's/^featured_added=//p' "$agent_out" | head -1)"
+  # the tab features one build per supported train; one more entry is a site change, not a release
+  if [[ "$featured_added" == "true" ]]; then
+    catalog_line="$catalog_line — **$featured_count featured entries, one more than before: review before merging**"
   fi
   log_ok "updated $catalog_rel"
 fi
