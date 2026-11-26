@@ -17,6 +17,7 @@
     { "type": "chore", "section": "Miscellaneous", "hidden": true }
   ],
   "packages": {
-    "pulp": { "component": "pulp" }
+    "pulp": { "component": "pulp" },
+    "sources": { "component": "sources" }
   }
 }

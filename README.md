@@ -6,9 +6,10 @@ The repository is a set of **packages**: a package is a top-level directory, ver
 and released on its own, that holds one action or several actions built on the same
 code. Each package documents its actions in its own `README.md`.
 
-| Package                  | Actions                                                             |
-| ------------------------ | ------------------------------------------------------------------- |
-| [`pulp`](pulp/README.md) | `pulp/package-delivery`, `pulp/promote-to-stable`, `pulp/setup-cli` |
+| Package                        | Actions                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
+| [`pulp`](pulp/README.md)       | `pulp/package-delivery`, `pulp/promote-to-stable`, `pulp/setup-cli` |
+| [`sources`](sources/README.md) | `sources/delivery`                                                  |
 
 ## Usage
 
