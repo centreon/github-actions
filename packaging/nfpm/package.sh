@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the packages of every nfpm configuration matching a pattern, in the current
+# Build the packages of every nfpm configuration matching a pattern, into the current
 # directory. Inputs (env): see the step of action.yml.
 set -euo pipefail
 
@@ -8,35 +8,9 @@ error() {
   exit 1
 }
 
-# sed replacement text: the three characters sed reads in it are escaped
-escape() {
-  local value=${1//\\/\\\\}
-  value=${value//\//\\/}
-  printf '%s' "${value//&/\\&}"
-}
-
-# "NAME=value" lines of an input, as "NAME<tab>value"; blank lines are skipped
-pairs() {
-  local line
-  while IFS= read -r line; do
-    [[ -z "${line//[[:space:]]/}" ]] && continue
-    line="${line#"${line%%[![:space:]]*}"}"
-    line="${line%"${line##*[![:space:]]}"}"
-    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || error "'${line}' is not a NAME=value line"
-    printf '%s\t%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
-  done <<< "$1"
-}
-
-# replaces @NAME@ in the given files
-substitute() {
-  local name=$1 value
-  value=$(escape "$2")
-  shift 2
-  sed -i "s/@${name}@/${value}/g" "$@"
-}
-
 [[ -n "${NFPM_FILE_PATTERN:-}" ]] || error "the nfpm_file_pattern input is empty"
 [[ -n "${COMMIT_HASH:-}" ]] || error "the commit_hash input is empty"
+export COMMIT_HASH
 [[ "$PACKAGE_EXTENSION" == "rpm" || "$PACKAGE_EXTENSION" == "deb" ]] || error "unknown package extension '${PACKAGE_EXTENSION}'"
 
 # ---- version, release and distribution, read by the nfpm configurations ----------------
@@ -82,15 +56,19 @@ if [[ -n "${INPUT_MAJOR_VERSION:-}" ]]; then
   fi
 fi
 
-# ---- signing key, kept out of the workspace and removed on exit ------------------------
-KEY_DIRECTORY=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nfpm-key.XXXXXX")
-trap 'rm -rf "${KEY_DIRECTORY:?}"' EXIT
-export RPM_SIGNING_KEY_FILE="${KEY_DIRECTORY}/key.gpg"
-(umask 077 && printf '%s' "${RPM_GPG_KEY:-}" > "$RPM_SIGNING_KEY_FILE")
+# ---- signing key: nfpm signs when the key file variable is set, and reads the
+# passphrase from its own variable. The file stays out of the workspace. --------------
+export RPM_SIGNING_KEY_FILE=""
 export RPM_SIGNING_KEY_ID="${RPM_GPG_SIGNING_KEY_ID:-}"
 export NFPM_RPM_PASSPHRASE="${RPM_GPG_SIGNING_PASSPHRASE:-}"
-
-PLACEHOLDERS=$(pairs "${PLACEHOLDERS:-}")
+if [[ -n "${RPM_GPG_KEY:-}" ]]; then
+  KEY_DIRECTORY=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nfpm-key.XXXXXX")
+  trap 'rm -rf "${KEY_DIRECTORY:?}"' EXIT
+  RPM_SIGNING_KEY_FILE="${KEY_DIRECTORY}/key.gpg"
+  (umask 077 && printf '%s' "$RPM_GPG_KEY" > "$RPM_SIGNING_KEY_FILE")
+else
+  echo "No signing key: the packages are not signed"
+fi
 
 # adds the license of the package to a deb, as /usr/share/doc/<package>/copyright
 add_copyright() {
@@ -134,33 +112,20 @@ for file in "${FILES[@]}"; do
 
   cd "$directory"
 
-  # without a key the packages are built unsigned
-  if [[ -z "$RPM_SIGNING_KEY_ID" ]]; then
-    sed -i -e "/signature:/d" -e "/RPM_SIGNING_KEY_FILE/d" -e "/RPM_SIGNING_KEY_ID/d" "$config"
-  fi
-
-  substitute APACHE_USER "$APACHE_USER" "$config"
-  substitute APACHE_GROUP "$APACHE_GROUP" "$config"
-  substitute COMMIT_HASH "$COMMIT_HASH" "$config"
-  while IFS=$'\t' read -r name value; do
-    [[ -n "$name" ]] && substitute "$name" "$value" "$config"
-  done <<< "$PLACEHOLDERS"
+  # the owner of a file is the one field nfpm does not read from the environment
+  sed -i -e "s/@APACHE_USER@/${APACHE_USER}/g" -e "s/@APACHE_GROUP@/${APACHE_GROUP}/g" "$config"
 
   if [[ "$PACKAGE_EXTENSION" == "deb" && "${DEB_COPYRIGHT:-false}" == "true" ]]; then
     add_copyright "$config"
   fi
 
   if grep -nE '@[A-Z][A-Z0-9_]*@' "$config"; then
-    echo "::error file=${file}::unsubstituted placeholder(s) in the rendered nfpm configuration"
+    echo "::error file=${file}::placeholder(s) left in the nfpm configuration: use \${NAME} variables"
     exit 1
   fi
 
-  nfpm package --config "$config" --packager "$PACKAGE_EXTENSION"
-
+  nfpm package --config "$config" --packager "$PACKAGE_EXTENSION" --target "${ROOT}/"
   cd "$ROOT"
-  if [[ "$(cd "$directory" && pwd -P)" != "$(pwd -P)" ]]; then
-    mv "${directory}"/*."${PACKAGE_EXTENSION}" ./
-  fi
 done
 
 ls -lh ./*."${PACKAGE_EXTENSION}"

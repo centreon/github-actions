@@ -178,7 +178,6 @@ jobs:
           release: "7"
           arch: all
           commit_hash: ${{ github.sha }}
-          placeholders: luaver=5.4
           cache_key: smoke-test-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.distrib }}
 
       - name: Check the smoke-tested package

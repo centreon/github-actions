@@ -5,12 +5,16 @@ platform: "linux"
 version: "${VERSION}"
 release: "${RELEASE}${DIST}"
 maintainer: "Smoke test <smoke-test@example.invalid>"
-description: "Built from @COMMIT_HASH@ for lua @luaver@"
+description: "Built from ${COMMIT_HASH}"
 license: "Apache-2.0"
 
 contents:
   - src: "./nfpm.yaml"
-    dst: "/usr/share/doc/smoke-test/nfpm.yaml"
+    dst: "/usr/share/doc/smoke-test-${VERSION}/nfpm.yaml"
+    expand: true
+    file_info:
+      owner: "@APACHE_USER@"
+      group: "@APACHE_GROUP@"
 
 rpm:
   summary: "Smoke test"

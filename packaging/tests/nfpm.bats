@@ -18,19 +18,19 @@ while ((\$# > 0)); do
   case \$1 in
     --config) config=\$2; shift 2 ;;
     --packager) packager=\$2; shift 2 ;;
+    --target) target=\$2; shift 2 ;;
     *) shift ;;
   esac
 done
 out="${CALLS}/\${config%.yaml}"
 mkdir "\$out"
-for name in VERSION RELEASE ARCH DIST MAJOR_VERSION NEXT_MAJOR_VERSION APACHE_USER RPM_SIGNING_KEY_ID \
-  NFPM_RPM_PASSPHRASE PHP_MIN_VERSION; do
+for name in VERSION RELEASE ARCH DIST MAJOR_VERSION NEXT_MAJOR_VERSION COMMIT_HASH RPM_SIGNING_KEY_FILE \
+  RPM_SIGNING_KEY_ID NFPM_RPM_PASSPHRASE PHP_MIN_VERSION; do
   printf '%s=%s\n' "\$name" "\${!name-unset}"
 done > "\${out}/env"
-echo "\$RPM_SIGNING_KEY_FILE" > "\${out}/key-path"
-cat "\$RPM_SIGNING_KEY_FILE" > "\${out}/key"
+[ -z "\$RPM_SIGNING_KEY_FILE" ] || cat "\$RPM_SIGNING_KEY_FILE" > "\${out}/key"
 cp "\$config" "\${out}/config"
-touch "\${config%.yaml}.\${packager}"
+touch "\${target}\${config%.yaml}.\${packager}"
 STUB
   chmod +x "${BIN}/nfpm"
 
@@ -38,7 +38,7 @@ STUB
 name: "centreon-web"
 license: "Apache-2.0"
 version: "${VERSION}"
-commit: "@COMMIT_HASH@"
+description: "Commit: ${COMMIT_HASH}"
 owner: "@APACHE_USER@:@APACHE_GROUP@"
 contents:
   - src: ./files
@@ -90,7 +90,6 @@ refute() {
   [ "$(given web RELEASE)" = "7" ]
   [ "$(given web DIST)" = ".el9" ]
   [ "$(given web ARCH)" = "all" ]
-  [ "$(given web APACHE_USER)" = "apache" ]
   [ -f "${ROOT}/web.rpm" ]
   [ ! -e "${ROOT}/packaging/web.rpm" ]
 }
@@ -100,7 +99,6 @@ refute() {
   [ "$status" -eq 0 ]
   [ "$(given web RELEASE)" = "7+deb12u1" ]
   [ "$(given web DIST)" = "" ]
-  [ "$(given web APACHE_USER)" = "www-data" ]
   [ -f "${ROOT}/web.deb" ]
   rm -r "${CALLS}/web"
   package noble
@@ -178,39 +176,34 @@ refute() {
   [ "$(given web PHP_MIN_VERSION)" = "8.4" ]
 }
 
-@test "the commit hash and the web server user are written in the configuration" {
+@test "the commit hash is a variable the configurations read" {
   package el9
-  grep -q '^commit: "abc123"$' "${CALLS}/web/config"
+  [ "$(given web COMMIT_HASH)" = "abc123" ]
+}
+
+@test "the web server user owns the files it is given, by its name on the distribution" {
+  package el9
   grep -q '^owner: "apache:apache"$' "${CALLS}/web/config"
 }
 
-@test "placeholders are replaced in the configuration, not in the other files" {
-  echo 'lua: "@luaver@ @PHP_MIN_VERSION@"' >> "${ROOT}/packaging/web.yaml"
-  package el9 PLACEHOLDERS=$'luaver=5.4\n\n  PHP_MIN_VERSION=8.4  '
-  [ "$status" -eq 0 ]
-  grep -q '^lua: "5.4 8.4"$' "${CALLS}/web/config"
-  [ "$(cat "${ROOT}/packaging/scripts/postinstall.sh")" = 'php @PHP_MIN_VERSION@' ]
+@test "the web server user of a deb is www-data" {
+  package bookworm
+  grep -q '^owner: "www-data:www-data"$' "${CALLS}/web/config"
 }
 
-@test "a placeholder value is written as is, whatever its characters" {
-  echo 'path: "@INSTALL_PATH@"' >> "${ROOT}/packaging/web.yaml"
-  package el9 PLACEHOLDERS='INSTALL_PATH=/usr/share/a&b\c=d'
-  [ "$status" -eq 0 ]
-  grep -qF 'path: "/usr/share/a&b\c=d"' "${CALLS}/web/config"
-}
-
-@test "a malformed placeholder line fails before anything is built" {
-  package el9 PLACEHOLDERS="not a pair"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"is not a NAME=value line"* ]]
-  [ ! -d "${CALLS}/web" ]
+@test "nothing else is edited in a configuration" {
+  cp "${ROOT}/packaging/web.yaml" "${BATS_TEST_TMPDIR}/before.yaml"
+  package el9
+  run diff "${BATS_TEST_TMPDIR}/before.yaml" "${CALLS}/web/config"
+  [ "$(grep -c '^[<>]' <<< "$output")" -eq 2 ]
+  [[ "$output" == *'< owner: "@APACHE_USER@:@APACHE_GROUP@"'* ]]
 }
 
 @test "a placeholder left in the configuration fails before nfpm runs" {
   echo 'left: "@NOT_REPLACED@"' >> "${ROOT}/packaging/web.yaml"
   package el9
   [ "$status" -ne 0 ]
-  [[ "$output" == *"unsubstituted placeholder"* ]]
+  [[ "$output" == *"placeholder(s) left"* ]]
   [ ! -d "${CALLS}/web" ]
 }
 
@@ -220,10 +213,9 @@ refute() {
   [ "$(cat "${CALLS}/web/key")" = "the-key" ]
   [ "$(given web RPM_SIGNING_KEY_ID)" = "key-id" ]
   [ "$(given web NFPM_RPM_PASSPHRASE)" = "secret" ]
-  [[ "$(cat "${CALLS}/web/key-path")" == "${RUNNER_TEMP}/"* ]]
-  [ ! -e "$(cat "${CALLS}/web/key-path")" ]
+  [[ "$(given web RPM_SIGNING_KEY_FILE)" == "${RUNNER_TEMP}/"* ]]
+  [ ! -e "$(given web RPM_SIGNING_KEY_FILE)" ]
   refute grep -rq "the-key" "$ROOT"
-  grep -q "signature:" "${CALLS}/web/config"
 }
 
 @test "the signing key is removed when the build fails" {
@@ -233,11 +225,12 @@ refute() {
   [ ! -e "$(cat "${CALLS}/key-path")" ]
 }
 
-@test "without a key identifier the signature is removed from the configuration" {
-  package el9 RPM_GPG_KEY= RPM_GPG_SIGNING_KEY_ID=
+@test "without a key nfpm is given no key file, which builds unsigned packages" {
+  package el9 RPM_GPG_KEY=
   [ "$status" -eq 0 ]
-  refute grep -q "signature:\|RPM_SIGNING_KEY" "${CALLS}/web/config"
-  grep -q "^  summary: web$" "${CALLS}/web/config"
+  [ "$(given web RPM_SIGNING_KEY_FILE)" = "" ]
+  [ ! -e "${CALLS}/web/key" ]
+  [ -z "$(ls -A "$RUNNER_TEMP")" ]
 }
 
 @test "deb_copyright adds the license matching the package to a deb" {
@@ -257,7 +250,7 @@ refute() {
 }
 
 @test "deb_copyright opens a contents list when the configuration has none" {
-  printf 'name: plain\ncommit: "@COMMIT_HASH@"\n' > "${ROOT}/packaging/web.yaml"
+  printf 'name: plain\ndescription: "${COMMIT_HASH}"\n' > "${ROOT}/packaging/web.yaml"
   package bookworm DEB_COPYRIGHT=true
   [ "$status" -eq 0 ]
   [ "$(tail -n 4 "${CALLS}/web/config" | head -n 2)" = $'contents:\n  - src: ./copyright' ]
@@ -275,16 +268,15 @@ refute() {
 
 @test "every configuration of every pattern is built" {
   mkdir "${ROOT}/other"
-  printf 'name: one\ncommit: "@COMMIT_HASH@"\n' > "${ROOT}/packaging/one.yaml"
-  printf 'name: two\ncommit: "@COMMIT_HASH@"\n' > "${ROOT}/other/two.yaml"
+  printf 'name: one\ndescription: "${COMMIT_HASH}"\n' > "${ROOT}/packaging/one.yaml"
+  printf 'name: two\ndescription: "${COMMIT_HASH}"\n' > "${ROOT}/other/two.yaml"
   package el9 NFPM_FILE_PATTERN="packaging/*.yaml other/two.yaml"
   [ "$status" -eq 0 ]
   [ -f "${ROOT}/web.rpm" ] && [ -f "${ROOT}/one.rpm" ] && [ -f "${ROOT}/two.rpm" ]
-  grep -q '^commit: "abc123"$' "${CALLS}/two/config"
 }
 
 @test "a configuration of the working directory itself is built in place" {
-  printf 'name: top\ncommit: "@COMMIT_HASH@"\n' > "${ROOT}/top.yaml"
+  printf 'name: top\ndescription: "${COMMIT_HASH}"\n' > "${ROOT}/top.yaml"
   package el9 NFPM_FILE_PATTERN="top.yaml"
   [ "$status" -eq 0 ]
   [ -f "${ROOT}/top.rpm" ]
