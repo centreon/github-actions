@@ -1,0 +1,112 @@
+name: "Package with nfpm"
+description: "Build the rpm or deb packages of nfpm configurations, cache them and optionally upload them"
+inputs:
+  nfpm_file_pattern:
+    description: "Pattern(s) of the nfpm configuration files, relative to the working directory"
+    required: true
+  distrib:
+    description: "Distribution name: el8, el9, el10, bookworm, trixie, jammy, noble, ..."
+    required: true
+  version:
+    description: "Package version. Give either this or major_version and minor_version"
+    required: false
+    default: ""
+  major_version:
+    description: "Major version (YY.MM). Also gives MAJOR_VERSION and NEXT_MAJOR_VERSION to the configurations"
+    required: false
+    default: ""
+  minor_version:
+    description: "Minor version, joined to major_version to make the package version"
+    required: false
+    default: ""
+  release:
+    description: "Package release number"
+    required: false
+    default: ""
+  arch:
+    description: "Package architecture"
+    required: false
+    default: ""
+  commit_hash:
+    description: "Commit the packages are built from, given to the configurations as COMMIT_HASH"
+    required: true
+  deb_release:
+    description: "Release number of a deb, when it is not the one of an rpm. Default: release"
+    required: false
+    default: ""
+  deb_copyright:
+    description: "Add the license file of the repository to a deb, as /usr/share/doc/<package>/copyright"
+    required: false
+    default: "false"
+  rpm_gpg_key:
+    description: "Private key signing the rpm packages"
+    required: false
+    default: ""
+  rpm_gpg_signing_key_id:
+    description: "Identifier of the signing key"
+    required: false
+    default: ""
+  rpm_gpg_signing_passphrase:
+    description: "Passphrase of the signing key"
+    required: false
+    default: ""
+  allow_unsigned:
+    description: "Build unsigned rpm packages when rpm_gpg_key is empty, instead of failing"
+    required: false
+    default: "false"
+  cache_key:
+    description: "Key the packages are cached under"
+    required: true
+  upload_artifacts:
+    description: "Also upload the packages as an artifact, kept one day"
+    required: false
+    default: "false"
+  artifact_name:
+    description: "Name of that artifact. Default: packages-<distrib>, with the architecture when one is given"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse distrib name
+      id: parse-distrib
+      uses: $/packaging/parse-distrib
+      with:
+        distrib: ${{ inputs.distrib }}
+
+    - name: Build the packages
+      shell: bash
+      env:
+        NFPM_FILE_PATTERN: ${{ inputs.nfpm_file_pattern }}
+        PACKAGE_EXTENSION: ${{ steps.parse-distrib.outputs.package_extension }}
+        PACKAGE_DISTRIB_SEPARATOR: ${{ steps.parse-distrib.outputs.package_distrib_separator }}
+        PACKAGE_DISTRIB_NAME: ${{ steps.parse-distrib.outputs.package_distrib_name }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_MAJOR_VERSION: ${{ inputs.major_version }}
+        INPUT_MINOR_VERSION: ${{ inputs.minor_version }}
+        INPUT_RELEASE: ${{ inputs.release }}
+        INPUT_ARCH: ${{ inputs.arch }}
+        COMMIT_HASH: ${{ inputs.commit_hash }}
+        DEB_RELEASE: ${{ inputs.deb_release }}
+        DEB_COPYRIGHT: ${{ inputs.deb_copyright }}
+        RPM_GPG_KEY: ${{ inputs.rpm_gpg_key }}
+        RPM_GPG_SIGNING_KEY_ID: ${{ inputs.rpm_gpg_signing_key_id }}
+        RPM_GPG_SIGNING_PASSPHRASE: ${{ inputs.rpm_gpg_signing_passphrase }}
+        ALLOW_UNSIGNED: ${{ inputs.allow_unsigned }}
+      # the variable, not the context: only the variable is right in a container job
+      run: '"${GITHUB_ACTION_PATH}/package.sh"'
+
+    - name: Cache the packages
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ./*.${{ steps.parse-distrib.outputs.package_extension }}
+        key: ${{ inputs.cache_key }}
+
+    - name: Upload the packages
+      if: inputs.upload_artifacts == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.artifact_name || format('packages-{0}{1}', inputs.distrib, inputs.arch && format('-{0}', inputs.arch) || '') }}
+        path: ./*.${{ steps.parse-distrib.outputs.package_extension }}
+        retention-days: 1

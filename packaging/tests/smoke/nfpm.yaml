@@ -1,0 +1,23 @@
+# package built by the smoke test of packaging/nfpm, with the real nfpm
+name: "smoke-test"
+arch: "${ARCH}"
+platform: "linux"
+version: "${VERSION}"
+release: "${RELEASE}${DIST}"
+maintainer: "Smoke test <smoke-test@example.invalid>"
+description: "Built from ${COMMIT_HASH}"
+license: "Apache-2.0"
+
+contents:
+  - src: "./nfpm.yaml"
+    dst: "/usr/share/doc/smoke-test-${VERSION}/nfpm.yaml"
+    expand: true
+    file_info:
+      owner: "@APACHE_USER@"
+      group: "@APACHE_GROUP@"
+
+rpm:
+  summary: "Smoke test"
+  signature:
+    key_file: ${RPM_SIGNING_KEY_FILE}
+    key_id: ${RPM_SIGNING_KEY_ID}
