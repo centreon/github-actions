@@ -1,0 +1,46 @@
+name: "Parse distrib"
+description: "Give the package extension, the naming and the family of a distribution"
+inputs:
+  distrib:
+    description: "Distribution name: el8, el9, el10 (or alma8, alma9, alma10), bookworm, trixie, jammy, noble, ..."
+    required: true
+
+outputs:
+  package_extension:
+    description: "Package extension: rpm or deb"
+    value: ${{ steps.parse-distrib.outputs.package_extension }}
+  package_version_separator:
+    description: "Separator between the package name and its version: - for rpm, _ for deb"
+    value: ${{ steps.parse-distrib.outputs.package_version_separator }}
+  package_distrib_separator:
+    description: "Separator between the package version and its distribution suffix"
+    value: ${{ steps.parse-distrib.outputs.package_distrib_separator }}
+  package_distrib_name:
+    description: "Distribution suffix of the package name: el9, deb12u1, 0ubuntu.24.04"
+    value: ${{ steps.parse-distrib.outputs.package_distrib_name }}
+  distrib_family:
+    description: "Distribution family: el, debian or ubuntu"
+    value: ${{ steps.parse-distrib.outputs.distrib_family }}
+  distrib_family_major:
+    description: "Distribution family, with its major version for el: el9, debian, ubuntu"
+    value: ${{ steps.parse-distrib.outputs.distrib_family_major }}
+  distrib_name:
+    description: "Name of the system: alma9, bookworm, noble"
+    value: ${{ steps.parse-distrib.outputs.distrib_name }}
+  repo_distrib_name:
+    description: "Distribution name in repository paths: el9, bookworm, noble"
+    value: ${{ steps.parse-distrib.outputs.repo_distrib_name }}
+  package_distrib:
+    description: "Same as repo_distrib_name, under its older name"
+    value: ${{ steps.parse-distrib.outputs.package_distrib }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse distrib
+      id: parse-distrib
+      shell: bash
+      env:
+        DISTRIB: ${{ inputs.distrib }}
+      # the variable, not the context: only the variable is right in a container job
+      run: '"${GITHUB_ACTION_PATH}/parse-distrib.sh"'
