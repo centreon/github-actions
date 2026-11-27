@@ -24,7 +24,7 @@ done
 out="${CALLS}/\${config%.yaml}"
 mkdir "\$out"
 for name in VERSION RELEASE ARCH DIST MAJOR_VERSION NEXT_MAJOR_VERSION APACHE_USER RPM_SIGNING_KEY_ID \
-  NFPM_RPM_PASSPHRASE PHP_MIN_VERSION LUA_VERSION; do
+  NFPM_RPM_PASSPHRASE PHP_MIN_VERSION; do
   printf '%s=%s\n' "\$name" "\${!name-unset}"
 done > "\${out}/env"
 echo "\$RPM_SIGNING_KEY_FILE" > "\${out}/key-path"
@@ -153,7 +153,7 @@ refute() {
   [ "$(given web NEXT_MAJOR_VERSION)" = "unset" ]
 }
 
-@test "the next major version follows the monthly cadence by default" {
+@test "the next major version is the next month since 26.10" {
   package el9 INPUT_MAJOR_VERSION=26.10
   [ "$(given web NEXT_MAJOR_VERSION)" = "26.11" ]
   rm -r "${CALLS}/web"
@@ -164,22 +164,27 @@ refute() {
   [ "$(given web NEXT_MAJOR_VERSION)" = "27.9" ]
 }
 
-@test "the next major version follows the biannual cadence when asked" {
-  package el9 INPUT_MAJOR_VERSION=24.04 VERSION_CADENCE=biannual
+@test "the next major version is six months later before 26.10" {
+  package el9 INPUT_MAJOR_VERSION=24.04
   [ "$(given web NEXT_MAJOR_VERSION)" = "24.10" ]
   rm -r "${CALLS}/web"
-  package el9 INPUT_MAJOR_VERSION=24.10 VERSION_CADENCE=biannual
+  package el9 INPUT_MAJOR_VERSION=24.10
   [ "$(given web NEXT_MAJOR_VERSION)" = "25.04" ]
+  rm -r "${CALLS}/web"
+  package el9 INPUT_MAJOR_VERSION=25.10
+  [ "$(given web NEXT_MAJOR_VERSION)" = "26.04" ]
 }
 
-@test "an unknown cadence or a malformed major version fails" {
-  package el9 INPUT_MAJOR_VERSION=26.10 VERSION_CADENCE=yearly
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"unknown version_cadence 'yearly'"* ]]
+@test "a malformed major version fails" {
   package el9 INPUT_MAJOR_VERSION=next
   [ "$status" -ne 0 ]
   [[ "$output" == *"is not YY.MM"* ]]
   [ ! -d "${CALLS}/web" ]
+}
+
+@test "the variables of the job reach the configurations" {
+  package el9 PHP_MIN_VERSION=8.4
+  [ "$(given web PHP_MIN_VERSION)" = "8.4" ]
 }
 
 @test "the commit hash and the web server user are written in the configuration" {
@@ -204,11 +209,6 @@ refute() {
   [ "$(cat "${ROOT}/outside.sh")" = 'php @PHP_MIN_VERSION@' ]
 }
 
-@test "a placeholder without value takes the one of the variable of its name" {
-  package el9 TREE_PLACEHOLDERS="PHP_MIN_VERSION" PHP_MIN_VERSION=8.2
-  [ "$(cat "${ROOT}/packaging/scripts/postinstall.sh")" = 'php 8.2' ]
-}
-
 @test "a placeholder value is written as is, whatever its characters" {
   echo 'path: "@INSTALL_PATH@"' >> "${ROOT}/packaging/web.yaml"
   package el9 PLACEHOLDERS='INSTALL_PATH=/usr/share/a&b\c=d'
@@ -219,22 +219,7 @@ refute() {
 @test "a malformed placeholder line fails before anything is built" {
   package el9 PLACEHOLDERS="not a pair"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"is neither NAME=value nor NAME"* ]]
-  [ ! -d "${CALLS}/web" ]
-}
-
-@test "environment lines are variables the configurations can read" {
-  package el9 ENVIRONMENT=$'PHP_MIN_VERSION=8.4\nOTHER=x'
-  [ "$status" -eq 0 ]
-  [ "$(given web PHP_MIN_VERSION)" = "8.4" ]
-}
-
-@test "a malformed or valueless environment line fails" {
-  package el9 ENVIRONMENT="8.4"
-  [ "$status" -ne 0 ]
-  package el9 ENVIRONMENT="PHP_MIN_VERSION"
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"'PHP_MIN_VERSION' has no value"* ]]
+  [[ "$output" == *"is not a NAME=value line"* ]]
   [ ! -d "${CALLS}/web" ]
 }
 
@@ -270,16 +255,6 @@ refute() {
   [ "$status" -eq 0 ]
   refute grep -q "signature:\|RPM_SIGNING_KEY" "${CALLS}/web/config"
   grep -q "^  summary: web$" "${CALLS}/web/config"
-}
-
-@test "the variables of a distribution are loaded from the env directory" {
-  mkdir "${ROOT}/packaging/env"
-  echo "export LUA_VERSION=5.4" > "${ROOT}/packaging/env/.env.bookworm"
-  package bookworm
-  [ "$(given web LUA_VERSION)" = "5.4" ]
-  rm -r "${CALLS}/web"
-  package el9
-  [ "$(given web LUA_VERSION)" = "unset" ]
 }
 
 @test "deb_copyright adds the license matching the package to a deb" {
@@ -347,10 +322,3 @@ refute() {
   [ ! -d "${CALLS}/web" ]
 }
 
-@test "a package extension that is not the one of the distribution fails" {
-  package el9 INPUT_PACKAGE_EXTENSION=deb
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"el9 packages are rpm"* ]]
-  package el9 INPUT_PACKAGE_EXTENSION=rpm
-  [ "$status" -eq 0 ]
-}

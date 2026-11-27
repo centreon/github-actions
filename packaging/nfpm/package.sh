@@ -15,26 +15,16 @@ escape() {
   printf '%s' "${value//&/\\&}"
 }
 
-# "NAME=value" lines of an input, as "NAME<tab>=value"; a line holding only "NAME" gives
-# "NAME<tab>", read later as the value of the variable NAME. Blank lines are skipped.
+# "NAME=value" lines of an input, as "NAME<tab>value"; blank lines are skipped
 pairs() {
   local line
   while IFS= read -r line; do
     [[ -z "${line//[[:space:]]/}" ]] && continue
     line="${line#"${line%%[![:space:]]*}"}"
     line="${line%"${line##*[![:space:]]}"}"
-    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)(=.*)?$ ]] || error "'${line}' is neither NAME=value nor NAME"
+    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || error "'${line}' is not a NAME=value line"
     printf '%s\t%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
   done <<< "$1"
-}
-
-# value of a pair: the text after "=", or the variable of that name
-value_of() {
-  if [[ -n "$2" ]]; then
-    printf '%s' "${2#=}"
-  else
-    printf '%s' "${!1-}"
-  fi
 }
 
 # replaces @NAME@ in the given files
@@ -48,9 +38,6 @@ substitute() {
 [[ -n "${NFPM_FILE_PATTERN:-}" ]] || error "the nfpm_file_pattern input is empty"
 [[ -n "${COMMIT_HASH:-}" ]] || error "the commit_hash input is empty"
 [[ "$PACKAGE_EXTENSION" == "rpm" || "$PACKAGE_EXTENSION" == "deb" ]] || error "unknown package extension '${PACKAGE_EXTENSION}'"
-if [[ -n "${INPUT_PACKAGE_EXTENSION:-}" && "$INPUT_PACKAGE_EXTENSION" != "$PACKAGE_EXTENSION" ]]; then
-  error "package_extension is '${INPUT_PACKAGE_EXTENSION}' but ${DISTRIB} packages are ${PACKAGE_EXTENSION}"
-fi
 
 # ---- version, release and distribution, read by the nfpm configurations ----------------
 if [[ -n "${INPUT_VERSION:-}" ]]; then
@@ -78,37 +65,25 @@ else
   export APACHE_GROUP="www-data"
 fi
 
-# the major version after this one, for the dependencies bounded by it
+# the major version after this one, for the dependencies bounded by it: versions were
+# biannual (24.04, 24.10, ...) before 26.10 and are monthly since
 if [[ -n "${INPUT_MAJOR_VERSION:-}" ]]; then
   export MAJOR_VERSION="$INPUT_MAJOR_VERSION"
   [[ "$MAJOR_VERSION" =~ ^([0-9]+)\.([0-9]+) ]] || error "major_version '${MAJOR_VERSION}' is not YY.MM"
   major_left=${BASH_REMATCH[1]}
   major_right=${BASH_REMATCH[2]}
-  case "${VERSION_CADENCE:-monthly}" in
-    monthly)
-      if [[ "$major_right" == "12" ]]; then
-        export NEXT_MAJOR_VERSION="$((major_left + 1)).01"
-      else
-        export NEXT_MAJOR_VERSION="${major_left}.$((10#$major_right + 1))"
-      fi
-      ;;
-    biannual)
-      if [[ "$major_right" == "04" ]]; then
-        export NEXT_MAJOR_VERSION="${major_left}.10"
-      else
-        export NEXT_MAJOR_VERSION="$((major_left + 1)).04"
-      fi
-      ;;
-    *) error "unknown version_cadence '${VERSION_CADENCE}'" ;;
-  esac
+  if ((10#$major_left * 100 + 10#$major_right < 2610)); then
+    if [[ "$major_right" == "04" ]]; then
+      export NEXT_MAJOR_VERSION="${major_left}.10"
+    else
+      export NEXT_MAJOR_VERSION="$((major_left + 1)).04"
+    fi
+  elif [[ "$major_right" == "12" ]]; then
+    export NEXT_MAJOR_VERSION="$((major_left + 1)).01"
+  else
+    export NEXT_MAJOR_VERSION="${major_left}.$((10#$major_right + 1))"
+  fi
 fi
-
-ENVIRONMENT=$(pairs "${ENVIRONMENT:-}")
-while IFS=$'\t' read -r name value; do
-  [[ -n "$name" ]] || continue
-  [[ -n "$value" ]] || error "environment: '${name}' has no value"
-  export "${name}=${value#=}"
-done <<< "$ENVIRONMENT"
 
 # ---- signing key, kept out of the workspace and removed on exit ------------------------
 KEY_DIRECTORY=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nfpm-key.XXXXXX")
@@ -161,15 +136,6 @@ for file in "${FILES[@]}"; do
   directory=$(dirname "$file")
   config=$(basename "$file")
 
-  # variables of a distribution, kept next to the configuration
-  if [[ -f "${directory}/env/.env.${DISTRIB}" ]]; then
-    echo "Loading ${directory}/env/.env.${DISTRIB}"
-    set +u
-    # shellcheck disable=SC1090
-    . "${directory}/env/.env.${DISTRIB}"
-    set -u
-  fi
-
   cd "$directory"
 
   # without a key the packages are built unsigned
@@ -181,12 +147,12 @@ for file in "${FILES[@]}"; do
   substitute APACHE_GROUP "$APACHE_GROUP" "$config"
   substitute COMMIT_HASH "$COMMIT_HASH" "$config"
   while IFS=$'\t' read -r name value; do
-    [[ -n "$name" ]] && substitute "$name" "$(value_of "$name" "$value")" "$config"
+    [[ -n "$name" ]] && substitute "$name" "$value" "$config"
   done <<< "$PLACEHOLDERS"
   while IFS=$'\t' read -r name value; do
     [[ -n "$name" ]] || continue
     while IFS= read -r match; do
-      substitute "$name" "$(value_of "$name" "$value")" "$match"
+      substitute "$name" "$value" "$match"
     done < <(grep -rl "@${name}@" . 2> /dev/null || true)
   done <<< "$TREE_PLACEHOLDERS"
 

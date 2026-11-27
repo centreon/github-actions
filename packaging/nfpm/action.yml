@@ -7,10 +7,6 @@ inputs:
   distrib:
     description: "Distribution name: el8, el9, el10, bookworm, trixie, jammy, noble, ..."
     required: true
-  package_extension:
-    description: "rpm or deb. Optional: it is known from distrib, and checked against it when given"
-    required: false
-    default: ""
   version:
     description: "Package version. Give either this or major_version and minor_version"
     required: false
@@ -23,10 +19,6 @@ inputs:
     description: "Minor version, joined to major_version to make the package version"
     required: false
     default: ""
-  version_cadence:
-    description: "How NEXT_MAJOR_VERSION follows major_version: monthly (26.10 then 26.11) or biannual (24.04 then 24.10)"
-    required: false
-    default: "monthly"
   release:
     description: "Package release number"
     required: false
@@ -55,15 +47,11 @@ inputs:
     required: false
     default: "false"
   placeholders:
-    description: "NAME=value lines: @NAME@ is replaced by value in the nfpm configurations. NAME alone: by the variable NAME"
+    description: "NAME=value lines: @NAME@ is replaced by value in the nfpm configurations"
     required: false
     default: ""
   tree_placeholders:
     description: "Same lines as placeholders, replaced in every file of the directory of a configuration"
-    required: false
-    default: ""
-  environment:
-    description: "NAME=value lines: variables the nfpm configurations can read as ${NAME}"
     required: false
     default: ""
   rpm_gpg_key:
@@ -103,15 +91,12 @@ runs:
       shell: bash
       env:
         NFPM_FILE_PATTERN: ${{ inputs.nfpm_file_pattern }}
-        DISTRIB: ${{ inputs.distrib }}
-        INPUT_PACKAGE_EXTENSION: ${{ inputs.package_extension }}
         PACKAGE_EXTENSION: ${{ steps.parse-distrib.outputs.package_extension }}
         PACKAGE_DISTRIB_SEPARATOR: ${{ steps.parse-distrib.outputs.package_distrib_separator }}
         PACKAGE_DISTRIB_NAME: ${{ steps.parse-distrib.outputs.package_distrib_name }}
         INPUT_VERSION: ${{ inputs.version }}
         INPUT_MAJOR_VERSION: ${{ inputs.major_version }}
         INPUT_MINOR_VERSION: ${{ inputs.minor_version }}
-        VERSION_CADENCE: ${{ inputs.version_cadence }}
         INPUT_RELEASE: ${{ inputs.release }}
         INPUT_ARCH: ${{ inputs.arch }}
         COMMIT_HASH: ${{ inputs.commit_hash }}
@@ -121,7 +106,6 @@ runs:
         DEB_COPYRIGHT: ${{ inputs.deb_copyright }}
         PLACEHOLDERS: ${{ inputs.placeholders }}
         TREE_PLACEHOLDERS: ${{ inputs.tree_placeholders }}
-        ENVIRONMENT: ${{ inputs.environment }}
         RPM_GPG_KEY: ${{ inputs.rpm_gpg_key }}
         RPM_GPG_SIGNING_KEY_ID: ${{ inputs.rpm_gpg_signing_key_id }}
         RPM_GPG_SIGNING_PASSPHRASE: ${{ inputs.rpm_gpg_signing_passphrase }}
