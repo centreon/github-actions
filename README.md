@@ -10,6 +10,7 @@ code. Each package documents its actions in its own `README.md`.
 | ------------------------------------------ | ------------------------------------------------------------------- |
 | [`pulp`](pulp/README.md)                   | `pulp/package-delivery`, `pulp/promote-to-stable`, `pulp/setup-cli` |
 | [`download-site`](download-site/README.md) | `download-site/sources-delivery`, `download-site/publication`       |
+| [`packaging`](packaging/README.md)         | `packaging/parse-distrib`                                           |
 
 ## Usage
 

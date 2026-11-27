@@ -76,6 +76,22 @@ jobs:
       - name: Jactionlint
         run: pipx run "jactionlint==${JACTIONLINT_VERSION}"
 
+      - name: Smoke test the wiring of packaging/parse-distrib
+        id: parse-distrib-smoke
+        uses: $/packaging/parse-distrib
+        with:
+          distrib: bookworm
+
+      - name: Check the smoke-tested outputs
+        env:
+          PACKAGE_EXTENSION: ${{ steps.parse-distrib-smoke.outputs.package_extension }}
+          PACKAGE_DISTRIB_NAME: ${{ steps.parse-distrib-smoke.outputs.package_distrib_name }}
+          DISTRIB_FAMILY: ${{ steps.parse-distrib-smoke.outputs.distrib_family }}
+          PACKAGE_DISTRIB: ${{ steps.parse-distrib-smoke.outputs.package_distrib }}
+        run: |
+          [[ "$PACKAGE_EXTENSION" == "deb" && "$PACKAGE_DISTRIB_NAME" == "deb12u1" ]]
+          [[ "$DISTRIB_FAMILY" == "debian" && "$PACKAGE_DISTRIB" == "bookworm" ]]
+
       # dry run: builds a tarball on a real runner and uploads nothing. Last step:
       # the action renames the archived directory in the workspace
       - name: Smoke test the wiring of download-site/sources-delivery

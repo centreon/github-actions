@@ -18,6 +18,7 @@
   ],
   "packages": {
     "pulp": { "component": "pulp" },
-    "download-site": { "component": "download-site" }
+    "download-site": { "component": "download-site" },
+    "packaging": { "component": "packaging" }
   }
 }
