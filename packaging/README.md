@@ -5,6 +5,7 @@ Actions shared by the packaging jobs.
 | Action                    | Purpose                                                                 |
 | ------------------------- | ----------------------------------------------------------------------- |
 | `packaging/parse-distrib` | Give the package extension, the naming and the family of a distribution |
+| `packaging/nfpm`          | Build rpm or deb packages with nfpm, cache them and upload them         |
 
 ## Parse distrib
 
@@ -56,3 +57,99 @@ caller that needs the former value reads `distrib_family_major`.
 Add its line to `parse-distrib.sh`, to this table and to the tests, and to the table of
 the `pulp` package (`pulp/lib/parse-distrib.sh`), which keeps its own copy: a test fails
 when the two disagree.
+
+## Package with nfpm
+
+```yaml
+- name: Package
+  uses: centreon/github-actions/packaging/nfpm@packaging/v1
+  with:
+    nfpm_file_pattern: "packaging/*.yaml"
+    distrib: ${{ matrix.distrib }}
+    major_version: ${{ needs.get-environment.outputs.major_version }}
+    minor_version: ${{ needs.get-environment.outputs.minor_version }}
+    release: ${{ needs.get-environment.outputs.release }}
+    arch: all
+    commit_hash: ${{ github.sha }}
+    cache_key: ${{ github.run_id }}-${{ github.sha }}-${{ matrix.distrib }}
+    rpm_gpg_key: ${{ secrets.RPM_GPG_SIGNING_KEY }}
+    rpm_gpg_signing_key_id: ${{ secrets.RPM_GPG_SIGNING_KEY_ID }}
+    rpm_gpg_signing_passphrase: ${{ secrets.RPM_GPG_SIGNING_PASSPHRASE }}
+```
+
+The action builds one package per nfpm configuration matching `nfpm_file_pattern` (one
+or several patterns) into the working directory, saves the packages in the cache under
+`cache_key` and, with `upload_artifacts: "true"`, uploads them as an artifact kept one
+day. `nfpm` must be installed: the packaging images provide it.
+
+This repository is public and holds no key: the signing key is an input, read from the
+secrets of the calling repository. It is written outside the workspace and removed when
+the step ends. An rpm without `rpm_gpg_key` fails the step, unless `allow_unsigned:
+"true"` asks for unsigned packages; a deb is not signed.
+
+### What a configuration can read
+
+nfpm replaces `${NAME}` by the variable `NAME` in most fields of a configuration
+(`version`, `release`, `description`, `depends`, the signature...), and in the `src` and
+`dst` of a `contents` entry that sets `expand: true`. nfpm runs in the directory of the
+configuration: its relative paths start there. The action gives it:
+
+| Variable                                           | Value                                                                             |
+| -------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `${VERSION}`                                       | `version`, or `major_version.minor_version`                                       |
+| `${RELEASE}`                                       | `release`; for a deb, followed by the distribution (`7+deb12u1`)                  |
+| `${DIST}`                                          | For an rpm, the distribution (`.el9`); empty for a deb                            |
+| `${ARCH}`                                          | `arch`                                                                            |
+| `${COMMIT_HASH}`                                   | `commit_hash`                                                                     |
+| `${MAJOR_VERSION}`, `${NEXT_MAJOR_VERSION}`        | `major_version` and the one after it; only when `major_version` is given          |
+| `${RPM_SIGNING_KEY_FILE}`, `${RPM_SIGNING_KEY_ID}` | The signing key of an rpm; empty otherwise, which is how nfpm skips the signature |
+| The variables of the job                           | As they are: set them with `env:` on the job, or through `$GITHUB_ENV`            |
+
+`NEXT_MAJOR_VERSION` follows the versions of Centreon: six months later before 26.10
+(`24.04` then `24.10`), the next month since (`26.10` then `26.11`).
+
+```yaml
+description: |
+  Centreon broker.
+  Commit: ${COMMIT_HASH}
+contents:
+  - src: "./module.so"
+    dst: "/usr/lib64/lua/${LUA_VERSION}/module.so"
+    expand: true
+    file_info:
+      owner: "@APACHE_USER@"
+```
+
+nfpm does not read the owner of a file from the environment. That is the one thing the
+action writes in a configuration: `@APACHE_USER@` and `@APACHE_GROUP@` become `apache`
+for an rpm and `www-data` for a deb. Any other `@UPPERCASE@` placeholder fails the step,
+and nothing is replaced inside the packaged files: a workflow that needs a value in an
+installation script writes it there before calling the action.
+
+### Options
+
+| Input            | Default              | Effect                                                                                              |
+| ---------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `deb_release`    | `release`            | Release number of a deb, when it is not the one of an rpm                                           |
+| `allow_unsigned` | `false`              | Builds unsigned rpm packages when there is no key, instead of failing                               |
+| `deb_copyright`  | `false`              | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
+| `artifact_name`  | `packages-<distrib>` | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
+
+### Switching from a local copy
+
+The local `package-nfpm` and `package` actions replaced `@NAME@` placeholders with sed
+and differ between repositories. Every repository changes `@COMMIT_HASH@` to
+`${COMMIT_HASH}` in its configurations and stops passing `package_extension` and
+`stability`. Then:
+
+| Local copy                        | Inputs                                                                       | In the repository                                                                                                                                                                                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| centreon                          | `deb_copyright: "true"`, `allow_unsigned: "true"`                            | A step removes the development files, sets `PHP_MIN_VERSION` and `PHP_MAX_VERSION`, and writes the PHP version in the two installation scripts of centreon-web                                                                                                 |
+| centreon-modules                  | `deb_copyright: "true"`                                                      | Same step, with the four `PHP_*` variables; sourceguardian-loader reads `${PHP_MIN_VERSION}` and `${PHP_MODULE_API}` with `expand: true`                                                                                                                       |
+| centreon-collect                  | `deb_copyright: "true"`                                                      | The Lua version of the `env/.env.<distrib>` files moves to the configuration that reads it                                                                                                                                                                     |
+| centreon-plugins                  | `version`; `deb_release`: `release` on unstable and canary, `1` otherwise    | Nothing else                                                                                                                                                                                                                                                   |
+| centreon-stream-connector-scripts | `version`; `deb_release` like centreon-plugins where the release is not kept | A step sets `LUA_VERSION`; the configurations read `${LUA_VERSION}` and `${VERSION}` instead of `@luaver@` and `@VERSION@`, with `expand: true` on the entries using them. Its debs take the suffix of the other projects: `1+deb12u1` instead of `1~bookworm` |
+| centreon-agent                    | `version`                                                                    | Nothing else                                                                                                                                                                                                                                                   |
+
+The packaging of centreon-plugin-packs builds one package per pack from a template and
+keeps its own action.
