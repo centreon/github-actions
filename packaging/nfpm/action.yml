@@ -1,0 +1,143 @@
+name: "Package with nfpm"
+description: "Build the rpm or deb packages of nfpm configurations, cache them and optionally upload them"
+inputs:
+  nfpm_file_pattern:
+    description: "Pattern(s) of the nfpm configuration files, relative to the working directory"
+    required: true
+  distrib:
+    description: "Distribution name: el8, el9, el10, bookworm, trixie, jammy, noble, ..."
+    required: true
+  package_extension:
+    description: "rpm or deb. Optional: it is known from distrib, and checked against it when given"
+    required: false
+    default: ""
+  version:
+    description: "Package version. Give either this or major_version and minor_version"
+    required: false
+    default: ""
+  major_version:
+    description: "Major version (YY.MM). Also gives MAJOR_VERSION and NEXT_MAJOR_VERSION to the configurations"
+    required: false
+    default: ""
+  minor_version:
+    description: "Minor version, joined to major_version to make the package version"
+    required: false
+    default: ""
+  version_cadence:
+    description: "How NEXT_MAJOR_VERSION follows major_version: monthly (26.10 then 26.11) or biannual (24.04 then 24.10)"
+    required: false
+    default: "monthly"
+  release:
+    description: "Package release number"
+    required: false
+    default: ""
+  arch:
+    description: "Package architecture"
+    required: false
+    default: ""
+  commit_hash:
+    description: "Commit the packages are built from, written in place of @COMMIT_HASH@"
+    required: true
+  stability:
+    description: "Stability of the branch: stable, testing, unstable or canary. Only read with deb_stable_release"
+    required: false
+    default: ""
+  deb_release_suffix:
+    description: "Distribution suffix of the release of a deb. Default: the one of parse-distrib (+deb12u1, -0ubuntu.24.04)"
+    required: false
+    default: ""
+  deb_stable_release:
+    description: "Release number forced on a deb when stability is neither unstable nor canary. Default: release is kept"
+    required: false
+    default: ""
+  deb_copyright:
+    description: "Add the license file of the repository to a deb, as /usr/share/doc/<package>/copyright"
+    required: false
+    default: "false"
+  placeholders:
+    description: "NAME=value lines: @NAME@ is replaced by value in the nfpm configurations. NAME alone: by the variable NAME"
+    required: false
+    default: ""
+  tree_placeholders:
+    description: "Same lines as placeholders, replaced in every file of the directory of a configuration"
+    required: false
+    default: ""
+  environment:
+    description: "NAME=value lines: variables the nfpm configurations can read as ${NAME}"
+    required: false
+    default: ""
+  rpm_gpg_key:
+    description: "Private key signing the rpm packages. Empty: the packages are not signed"
+    required: false
+    default: ""
+  rpm_gpg_signing_key_id:
+    description: "Identifier of the signing key"
+    required: false
+    default: ""
+  rpm_gpg_signing_passphrase:
+    description: "Passphrase of the signing key"
+    required: false
+    default: ""
+  cache_key:
+    description: "Key the packages are cached under"
+    required: true
+  upload_artifacts:
+    description: "Also upload the packages as an artifact, kept one day"
+    required: false
+    default: "false"
+  artifact_name:
+    description: "Name of that artifact. Default: packages-<distrib>, with the architecture when one is given"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Parse distrib name
+      id: parse-distrib
+      uses: $/packaging/parse-distrib
+      with:
+        distrib: ${{ inputs.distrib }}
+
+    - name: Build the packages
+      shell: bash
+      env:
+        NFPM_FILE_PATTERN: ${{ inputs.nfpm_file_pattern }}
+        DISTRIB: ${{ inputs.distrib }}
+        INPUT_PACKAGE_EXTENSION: ${{ inputs.package_extension }}
+        PACKAGE_EXTENSION: ${{ steps.parse-distrib.outputs.package_extension }}
+        PACKAGE_DISTRIB_SEPARATOR: ${{ steps.parse-distrib.outputs.package_distrib_separator }}
+        PACKAGE_DISTRIB_NAME: ${{ steps.parse-distrib.outputs.package_distrib_name }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_MAJOR_VERSION: ${{ inputs.major_version }}
+        INPUT_MINOR_VERSION: ${{ inputs.minor_version }}
+        VERSION_CADENCE: ${{ inputs.version_cadence }}
+        INPUT_RELEASE: ${{ inputs.release }}
+        INPUT_ARCH: ${{ inputs.arch }}
+        COMMIT_HASH: ${{ inputs.commit_hash }}
+        STABILITY: ${{ inputs.stability }}
+        DEB_RELEASE_SUFFIX: ${{ inputs.deb_release_suffix }}
+        DEB_STABLE_RELEASE: ${{ inputs.deb_stable_release }}
+        DEB_COPYRIGHT: ${{ inputs.deb_copyright }}
+        PLACEHOLDERS: ${{ inputs.placeholders }}
+        TREE_PLACEHOLDERS: ${{ inputs.tree_placeholders }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        RPM_GPG_KEY: ${{ inputs.rpm_gpg_key }}
+        RPM_GPG_SIGNING_KEY_ID: ${{ inputs.rpm_gpg_signing_key_id }}
+        RPM_GPG_SIGNING_PASSPHRASE: ${{ inputs.rpm_gpg_signing_passphrase }}
+      # the variable, not the context: only the variable is right in a container job
+      run: '"${GITHUB_ACTION_PATH}/package.sh"'
+
+    - name: Cache the packages
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ./*.${{ steps.parse-distrib.outputs.package_extension }}
+        key: ${{ inputs.cache_key }}
+
+    - name: Upload the packages
+      if: inputs.upload_artifacts == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: ${{ inputs.artifact_name || format('packages-{0}{1}', inputs.distrib, inputs.arch && format('-{0}', inputs.arch) || '') }}
+        path: ./*.${{ steps.parse-distrib.outputs.package_extension }}
+        retention-days: 1

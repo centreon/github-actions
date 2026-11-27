@@ -5,6 +5,7 @@ Actions shared by the packaging jobs.
 | Action                    | Purpose                                                                 |
 | ------------------------- | ----------------------------------------------------------------------- |
 | `packaging/parse-distrib` | Give the package extension, the naming and the family of a distribution |
+| `packaging/nfpm`          | Build rpm or deb packages with nfpm, cache them and upload them         |
 
 ## Parse distrib
 
@@ -56,3 +57,85 @@ caller that needs the former value reads `distrib_family_major`.
 Add its line to `parse-distrib.sh`, to this table and to the tests, and to the table of
 the `pulp` package (`pulp/lib/parse-distrib.sh`), which keeps its own copy: a test fails
 when the two disagree.
+
+## Package with nfpm
+
+```yaml
+- name: Package
+  uses: centreon/github-actions/packaging/nfpm@packaging/v1
+  with:
+    nfpm_file_pattern: "packaging/*.yaml"
+    distrib: ${{ matrix.distrib }}
+    major_version: ${{ needs.get-environment.outputs.major_version }}
+    minor_version: ${{ needs.get-environment.outputs.minor_version }}
+    release: ${{ needs.get-environment.outputs.release }}
+    arch: all
+    commit_hash: ${{ github.sha }}
+    cache_key: ${{ github.run_id }}-${{ github.sha }}-${{ matrix.distrib }}
+    rpm_gpg_key: ${{ secrets.RPM_GPG_SIGNING_KEY }}
+    rpm_gpg_signing_key_id: ${{ secrets.RPM_GPG_SIGNING_KEY_ID }}
+    rpm_gpg_signing_passphrase: ${{ secrets.RPM_GPG_SIGNING_PASSPHRASE }}
+```
+
+The action builds one package per nfpm configuration matching `nfpm_file_pattern` (one
+or several patterns), moves the packages to the working directory, saves them in the
+cache under `cache_key` and, with `upload_artifacts: "true"`, uploads them as an
+artifact kept one day. `nfpm` must be installed: the packaging images provide it.
+
+This repository is public and holds no key: the signing key is an input, read from the
+secrets of the calling repository. It is written outside the workspace and removed when
+the step ends. Without `rpm_gpg_signing_key_id` the packages are built unsigned.
+
+### What a configuration can read
+
+| Variable                                                       | Value                                                                    |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `${VERSION}`                                                   | `version`, or `major_version.minor_version`                              |
+| `${RELEASE}`                                                   | `release`; for a deb, followed by the distribution (`7+deb12u1`)         |
+| `${DIST}`                                                      | For an rpm, the distribution (`.el9`); empty for a deb                   |
+| `${ARCH}`                                                      | `arch`                                                                   |
+| `${MAJOR_VERSION}`, `${NEXT_MAJOR_VERSION}`                    | `major_version` and the one after it; only when `major_version` is given |
+| `${APACHE_USER}`, `${APACHE_GROUP}`                            | `apache` for an rpm, `www-data` for a deb                                |
+| `${RPM_SIGNING_KEY_FILE}`, `${RPM_SIGNING_KEY_ID}`             | The signing key                                                          |
+| The variables of `environment`                                 | One `NAME=value` per line                                                |
+| The variables of `env/.env.<distrib>`, next to a configuration | Loaded when the file exists                                              |
+| The variables of the job                                       | As they are                                                              |
+
+Placeholders are replaced before nfpm runs:
+
+- `@COMMIT_HASH@`, `@APACHE_USER@` and `@APACHE_GROUP@`, in the configuration.
+- The ones of `placeholders`, in the configuration: one `NAME=value` per line replaces
+  `@NAME@`. A line holding only `NAME` takes the value of the variable `NAME`.
+- The ones of `tree_placeholders`, written the same way, in every file of the
+  directory of the configuration (scripts, templates).
+- An `@UPPERCASE@` placeholder left in a configuration fails the step.
+
+### Options
+
+| Input                | Default                | Effect                                                                                              |
+| -------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
+| `version_cadence`    | `monthly`              | `NEXT_MAJOR_VERSION` after `26.10` is `26.11`; with `biannual`, after `24.04` it is `24.10`         |
+| `deb_release_suffix` | From `parse-distrib`   | Distribution suffix of the release of a deb, for example `~bookworm`                                |
+| `deb_stable_release` | empty: release is kept | Release number forced on a deb when `stability` is neither `unstable` nor `canary`                  |
+| `deb_copyright`      | `false`                | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
+| `package_extension`  | From `distrib`         | Not needed; when given, the step fails if it is not the extension of `distrib`                      |
+| `artifact_name`      | `packages-<distrib>`   | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
+
+### Switching from a local copy
+
+The local `package-nfpm` and `package` actions differ between repositories. What each
+one did on its own is an input here:
+
+| Local copy                        | Inputs giving the same packages                                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| centreon                          | `deb_copyright: "true"`; the PHP versions as `environment` and `tree_placeholders`; `version_cadence: biannual` up to 25.10      |
+| centreon-collect                  | `deb_copyright: "true"`; `version_cadence: biannual` up to 25.10                                                                 |
+| centreon-modules                  | Same as centreon, plus `placeholders: CENTREON_VERSION=<version>`                                                                |
+| centreon-plugins                  | `version`, `stability` and `deb_stable_release: "1"`                                                                             |
+| centreon-stream-connector-scripts | `version`, `deb_release_suffix: "~<distrib>"`, `placeholders` for `luaver` and `VERSION`, `deb_stable_release: "1"` where needed |
+| centreon-agent                    | `version`                                                                                                                        |
+
+Three things stay in the calling repository, before this action: removing the
+development files of a module, choosing the PHP versions, and reading the Lua version.
+The packaging of centreon-plugin-packs builds one package per pack from a template and
+keeps its own action.

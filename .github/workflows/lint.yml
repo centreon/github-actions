@@ -127,11 +127,23 @@ jobs:
         include:
           - name: debian
             image: debian:12@sha256:1d04200c2ece1d4d75a2a6f8e11ebce7d86a2ae28b34bb2c9cbb3ee9f4953e75
+            distrib: bookworm
+            package: smoke-test_1.0.0-7+deb12u1_all.deb
           - name: almalinux
             image: almalinux:9@sha256:02df05719ef287ebd0df0a1eedb9172a00bd70703aed7b25660e426b8e0d6047
+            distrib: el9
+            package: smoke-test-1.0.0-7.el9.noarch.rpm
     container:
       image: ${{ matrix.image }}
+    env:
+      NFPM_VERSION: "2.43.4"
+      NFPM_SHA256: cafb544650cb0305d1b164fc0ab261eb77a81af324e18011282d326b326d20fb
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - name: Smoke test packaging/parse-distrib in a container
         id: parse-distrib-smoke
         uses: $/packaging/parse-distrib
@@ -144,3 +156,36 @@ jobs:
           DISTRIB_FAMILY_MAJOR: ${{ steps.parse-distrib-smoke.outputs.distrib_family_major }}
         run: |
           [[ "$PACKAGE_DISTRIB_NAME" == "el9" && "$DISTRIB_FAMILY_MAJOR" == "el9" ]]
+
+      - name: Install nfpm
+        run: |
+          if command -v apt-get > /dev/null; then
+            apt-get update
+            apt-get install --yes --no-install-recommends ca-certificates curl
+          fi
+          curl --fail --silent --show-error --location --output /tmp/nfpm.tar.gz \
+            "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz"
+          echo "${NFPM_SHA256}  /tmp/nfpm.tar.gz" | sha256sum --check
+          tar --extract --gzip --file /tmp/nfpm.tar.gz --directory /usr/local/bin nfpm
+
+      # a real, unsigned package, cached under a key nothing reads
+      - name: Smoke test packaging/nfpm in a container
+        uses: $/packaging/nfpm
+        with:
+          nfpm_file_pattern: packaging/tests/smoke/*.yaml
+          distrib: ${{ matrix.distrib }}
+          version: "1.0.0"
+          release: "7"
+          arch: all
+          commit_hash: ${{ github.sha }}
+          placeholders: luaver=5.4
+          cache_key: smoke-test-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.distrib }}
+
+      - name: Check the smoke-tested package
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          ls -l
+          [[ -f "$PACKAGE" ]]
+          # the signing key file never lands in the workspace
+          [[ -z "$(find . -name '*.gpg')" ]]
