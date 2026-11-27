@@ -31,7 +31,7 @@ if [[ "$PACKAGE_EXTENSION" == "rpm" ]]; then
   export APACHE_GROUP="apache"
 else
   export DIST=""
-  RELEASE="${DEB_RELEASE:-$RELEASE}${DEB_RELEASE_SUFFIX:-$DISTRIB_SUFFIX}"
+  RELEASE="${DEB_RELEASE:-$RELEASE}${DISTRIB_SUFFIX}"
   export APACHE_USER="www-data"
   export APACHE_GROUP="www-data"
 fi

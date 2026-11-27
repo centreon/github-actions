@@ -113,15 +113,6 @@ refute() {
   [ "$(given web RELEASE)" = "7" ]
 }
 
-@test "deb_release_suffix replaces the suffix of a deb only" {
-  package bookworm DEB_RELEASE_SUFFIX="~bookworm"
-  [ "$(given web RELEASE)" = "7~bookworm" ]
-  rm -r "${CALLS}/web"
-  package el9 DEB_RELEASE_SUFFIX="~bookworm"
-  [ "$(given web RELEASE)" = "7" ]
-  [ "$(given web DIST)" = ".el9" ]
-}
-
 @test "the version is made of the major and minor versions when it is not given" {
   package el9 INPUT_VERSION= INPUT_MAJOR_VERSION=26.10 INPUT_MINOR_VERSION=4
   [ "$status" -eq 0 ]

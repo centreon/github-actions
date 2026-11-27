@@ -30,10 +30,6 @@ inputs:
   commit_hash:
     description: "Commit the packages are built from, given to the configurations as COMMIT_HASH"
     required: true
-  deb_release_suffix:
-    description: "Distribution suffix of the release of a deb. Default: the one of parse-distrib (+deb12u1, -0ubuntu.24.04)"
-    required: false
-    default: ""
   deb_release:
     description: "Release number of a deb, when it is not the one of an rpm. Default: release"
     required: false
@@ -88,7 +84,6 @@ runs:
         INPUT_RELEASE: ${{ inputs.release }}
         INPUT_ARCH: ${{ inputs.arch }}
         COMMIT_HASH: ${{ inputs.commit_hash }}
-        DEB_RELEASE_SUFFIX: ${{ inputs.deb_release_suffix }}
         DEB_RELEASE: ${{ inputs.deb_release }}
         DEB_COPYRIGHT: ${{ inputs.deb_copyright }}
         RPM_GPG_KEY: ${{ inputs.rpm_gpg_key }}

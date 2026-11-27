@@ -126,12 +126,11 @@ installation script writes it there before calling the action.
 
 ### Options
 
-| Input                | Default              | Effect                                                                                              |
-| -------------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
-| `deb_release`        | `release`            | Release number of a deb, when it is not the one of an rpm                                           |
-| `deb_release_suffix` | From `parse-distrib` | Distribution suffix of the release of a deb, for example `~bookworm`                                |
-| `deb_copyright`      | `false`              | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
-| `artifact_name`      | `packages-<distrib>` | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
+| Input           | Default              | Effect                                                                                              |
+| --------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `deb_release`   | `release`            | Release number of a deb, when it is not the one of an rpm                                           |
+| `deb_copyright` | `false`              | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
+| `artifact_name` | `packages-<distrib>` | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
 
 ### Switching from a local copy
 
@@ -140,14 +139,14 @@ and differ between repositories. Every repository changes `@COMMIT_HASH@` to
 `${COMMIT_HASH}` in its configurations and stops passing `package_extension` and
 `stability`. Then:
 
-| Local copy                        | Inputs                                                                             | In the repository                                                                                                                                                         |
-| --------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| centreon                          | `deb_copyright: "true"`                                                            | A step removes the development files, sets `PHP_MIN_VERSION` and `PHP_MAX_VERSION`, and writes the PHP version in the two installation scripts of centreon-web            |
-| centreon-modules                  | `deb_copyright: "true"`                                                            | Same step, with the four `PHP_*` variables; sourceguardian-loader reads `${PHP_MIN_VERSION}` and `${PHP_MODULE_API}` with `expand: true`                                  |
-| centreon-collect                  | `deb_copyright: "true"`                                                            | The Lua version of the `env/.env.<distrib>` files moves to the configuration that reads it                                                                                |
-| centreon-plugins                  | `version`; `deb_release`: `release` on unstable and canary, `1` otherwise          | Nothing else                                                                                                                                                              |
-| centreon-stream-connector-scripts | `version`, `deb_release_suffix: "~<distrib>"`, `deb_release` like centreon-plugins | A step sets `LUA_VERSION`; the configurations read `${LUA_VERSION}` and `${VERSION}` instead of `@luaver@` and `@VERSION@`, with `expand: true` on the entries using them |
-| centreon-agent                    | `version`                                                                          | Nothing else                                                                                                                                                              |
+| Local copy                        | Inputs                                                                       | In the repository                                                                                                                                                                                                                                              |
+| --------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| centreon                          | `deb_copyright: "true"`                                                      | A step removes the development files, sets `PHP_MIN_VERSION` and `PHP_MAX_VERSION`, and writes the PHP version in the two installation scripts of centreon-web                                                                                                 |
+| centreon-modules                  | `deb_copyright: "true"`                                                      | Same step, with the four `PHP_*` variables; sourceguardian-loader reads `${PHP_MIN_VERSION}` and `${PHP_MODULE_API}` with `expand: true`                                                                                                                       |
+| centreon-collect                  | `deb_copyright: "true"`                                                      | The Lua version of the `env/.env.<distrib>` files moves to the configuration that reads it                                                                                                                                                                     |
+| centreon-plugins                  | `version`; `deb_release`: `release` on unstable and canary, `1` otherwise    | Nothing else                                                                                                                                                                                                                                                   |
+| centreon-stream-connector-scripts | `version`; `deb_release` like centreon-plugins where the release is not kept | A step sets `LUA_VERSION`; the configurations read `${LUA_VERSION}` and `${VERSION}` instead of `@luaver@` and `@VERSION@`, with `expand: true` on the entries using them. Its debs take the suffix of the other projects: `1+deb12u1` instead of `1~bookworm` |
+| centreon-agent                    | `version`                                                                    | Nothing else                                                                                                                                                                                                                                                   |
 
 The packaging of centreon-plugin-packs builds one package per pack from a template and
 keeps its own action.
