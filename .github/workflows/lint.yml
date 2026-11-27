@@ -116,7 +116,7 @@ jobs:
 
   # most callers of the packaging actions run in a container, where paths differ
   smoke-container:
-    name: smoke (${{ matrix.image }})
+    name: smoke (${{ matrix.name }})
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
@@ -124,7 +124,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ["debian:12", "almalinux:9"]
+        include:
+          - name: debian
+            image: debian:12@sha256:1d04200c2ece1d4d75a2a6f8e11ebce7d86a2ae28b34bb2c9cbb3ee9f4953e75
+          - name: almalinux
+            image: almalinux:9@sha256:02df05719ef287ebd0df0a1eedb9172a00bd70703aed7b25660e426b8e0d6047
     container:
       image: ${{ matrix.image }}
     steps:
