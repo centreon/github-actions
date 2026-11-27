@@ -216,11 +216,28 @@ refute() {
   [ ! -e "$(cat "${CALLS}/key-path")" ]
 }
 
-@test "without a key nfpm is given no key file, which builds unsigned packages" {
+@test "an rpm without a key fails before anything is built" {
   package el9 RPM_GPG_KEY=
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no signing key"* ]]
+  [ ! -d "${CALLS}/web" ]
+}
+
+@test "allow_unsigned builds an rpm without a key, with no key file given to nfpm" {
+  package el9 RPM_GPG_KEY= ALLOW_UNSIGNED=true
   [ "$status" -eq 0 ]
+  [[ "$output" == *"::warning::"*"not signed"* ]]
   [ "$(given web RPM_SIGNING_KEY_FILE)" = "" ]
-  [ ! -e "${CALLS}/web/key" ]
+  [ "$(given web RPM_SIGNING_KEY_ID)" = "" ]
+  [ -z "$(ls -A "$RUNNER_TEMP")" ]
+}
+
+@test "a deb needs no key, and is never given one" {
+  package bookworm RPM_GPG_KEY=
+  [ "$status" -eq 0 ]
+  rm -r "${CALLS}/web"
+  package bookworm
+  [ "$(given web RPM_SIGNING_KEY_FILE)" = "" ]
   [ -z "$(ls -A "$RUNNER_TEMP")" ]
 }
 

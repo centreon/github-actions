@@ -56,18 +56,23 @@ if [[ -n "${INPUT_MAJOR_VERSION:-}" ]]; then
   fi
 fi
 
-# ---- signing key: nfpm signs when the key file variable is set, and reads the
-# passphrase from its own variable. The file stays out of the workspace. --------------
+# ---- signing key of the rpm packages: nfpm signs when the key file variable is set, and
+# reads the passphrase from its own variable. The file stays out of the workspace. ----
 export RPM_SIGNING_KEY_FILE=""
-export RPM_SIGNING_KEY_ID="${RPM_GPG_SIGNING_KEY_ID:-}"
-export NFPM_RPM_PASSPHRASE="${RPM_GPG_SIGNING_PASSPHRASE:-}"
-if [[ -n "${RPM_GPG_KEY:-}" ]]; then
-  KEY_DIRECTORY=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nfpm-key.XXXXXX")
-  trap 'rm -rf "${KEY_DIRECTORY:?}"' EXIT
-  RPM_SIGNING_KEY_FILE="${KEY_DIRECTORY}/key.gpg"
-  (umask 077 && printf '%s' "$RPM_GPG_KEY" > "$RPM_SIGNING_KEY_FILE")
-else
-  echo "No signing key: the packages are not signed"
+export RPM_SIGNING_KEY_ID=""
+if [[ "$PACKAGE_EXTENSION" == "rpm" ]]; then
+  if [[ -n "${RPM_GPG_KEY:-}" ]]; then
+    KEY_DIRECTORY=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nfpm-key.XXXXXX")
+    trap 'rm -rf "${KEY_DIRECTORY:?}"' EXIT
+    RPM_SIGNING_KEY_FILE="${KEY_DIRECTORY}/key.gpg"
+    (umask 077 && printf '%s' "$RPM_GPG_KEY" > "$RPM_SIGNING_KEY_FILE")
+    RPM_SIGNING_KEY_ID="${RPM_GPG_SIGNING_KEY_ID:-}"
+    export NFPM_RPM_PASSPHRASE="${RPM_GPG_SIGNING_PASSPHRASE:-}"
+  elif [[ "${ALLOW_UNSIGNED:-false}" == "true" ]]; then
+    echo "::warning::no signing key: the rpm packages are not signed"
+  else
+    error "no signing key: give rpm_gpg_key, or allow_unsigned to build unsigned rpm packages"
+  fi
 fi
 
 # adds the license of the package to a deb, as /usr/share/doc/<package>/copyright

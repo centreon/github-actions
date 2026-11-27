@@ -84,24 +84,26 @@ day. `nfpm` must be installed: the packaging images provide it.
 
 This repository is public and holds no key: the signing key is an input, read from the
 secrets of the calling repository. It is written outside the workspace and removed when
-the step ends. Without `rpm_gpg_key` the packages are built unsigned.
+the step ends. An rpm without `rpm_gpg_key` fails the step, unless `allow_unsigned:
+"true"` asks for unsigned packages; a deb is not signed.
 
 ### What a configuration can read
 
 nfpm replaces `${NAME}` by the variable `NAME` in most fields of a configuration
 (`version`, `release`, `description`, `depends`, the signature...), and in the `src` and
-`dst` of a `contents` entry that sets `expand: true`. The action gives it:
+`dst` of a `contents` entry that sets `expand: true`. nfpm runs in the directory of the
+configuration: its relative paths start there. The action gives it:
 
-| Variable                                           | Value                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------- |
-| `${VERSION}`                                       | `version`, or `major_version.minor_version`                               |
-| `${RELEASE}`                                       | `release`; for a deb, followed by the distribution (`7+deb12u1`)          |
-| `${DIST}`                                          | For an rpm, the distribution (`.el9`); empty for a deb                    |
-| `${ARCH}`                                          | `arch`                                                                    |
-| `${COMMIT_HASH}`                                   | `commit_hash`                                                             |
-| `${MAJOR_VERSION}`, `${NEXT_MAJOR_VERSION}`        | `major_version` and the one after it; only when `major_version` is given  |
-| `${RPM_SIGNING_KEY_FILE}`, `${RPM_SIGNING_KEY_ID}` | The signing key; empty without one, which is how nfpm skips the signature |
-| The variables of the job                           | As they are: set them with `env:` on the job, or through `$GITHUB_ENV`    |
+| Variable                                           | Value                                                                             |
+| -------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `${VERSION}`                                       | `version`, or `major_version.minor_version`                                       |
+| `${RELEASE}`                                       | `release`; for a deb, followed by the distribution (`7+deb12u1`)                  |
+| `${DIST}`                                          | For an rpm, the distribution (`.el9`); empty for a deb                            |
+| `${ARCH}`                                          | `arch`                                                                            |
+| `${COMMIT_HASH}`                                   | `commit_hash`                                                                     |
+| `${MAJOR_VERSION}`, `${NEXT_MAJOR_VERSION}`        | `major_version` and the one after it; only when `major_version` is given          |
+| `${RPM_SIGNING_KEY_FILE}`, `${RPM_SIGNING_KEY_ID}` | The signing key of an rpm; empty otherwise, which is how nfpm skips the signature |
+| The variables of the job                           | As they are: set them with `env:` on the job, or through `$GITHUB_ENV`            |
 
 `NEXT_MAJOR_VERSION` follows the versions of Centreon: six months later before 26.10
 (`24.04` then `24.10`), the next month since (`26.10` then `26.11`).
@@ -126,11 +128,12 @@ installation script writes it there before calling the action.
 
 ### Options
 
-| Input           | Default              | Effect                                                                                              |
-| --------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
-| `deb_release`   | `release`            | Release number of a deb, when it is not the one of an rpm                                           |
-| `deb_copyright` | `false`              | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
-| `artifact_name` | `packages-<distrib>` | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
+| Input            | Default              | Effect                                                                                              |
+| ---------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `deb_release`    | `release`            | Release number of a deb, when it is not the one of an rpm                                           |
+| `allow_unsigned` | `false`              | Builds unsigned rpm packages when there is no key, instead of failing                               |
+| `deb_copyright`  | `false`              | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
+| `artifact_name`  | `packages-<distrib>` | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
 
 ### Switching from a local copy
 
@@ -141,7 +144,7 @@ and differ between repositories. Every repository changes `@COMMIT_HASH@` to
 
 | Local copy                        | Inputs                                                                       | In the repository                                                                                                                                                                                                                                              |
 | --------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| centreon                          | `deb_copyright: "true"`                                                      | A step removes the development files, sets `PHP_MIN_VERSION` and `PHP_MAX_VERSION`, and writes the PHP version in the two installation scripts of centreon-web                                                                                                 |
+| centreon                          | `deb_copyright: "true"`, `allow_unsigned: "true"`                            | A step removes the development files, sets `PHP_MIN_VERSION` and `PHP_MAX_VERSION`, and writes the PHP version in the two installation scripts of centreon-web                                                                                                 |
 | centreon-modules                  | `deb_copyright: "true"`                                                      | Same step, with the four `PHP_*` variables; sourceguardian-loader reads `${PHP_MIN_VERSION}` and `${PHP_MODULE_API}` with `expand: true`                                                                                                                       |
 | centreon-collect                  | `deb_copyright: "true"`                                                      | The Lua version of the `env/.env.<distrib>` files moves to the configuration that reads it                                                                                                                                                                     |
 | centreon-plugins                  | `version`; `deb_release`: `release` on unstable and canary, `1` otherwise    | Nothing else                                                                                                                                                                                                                                                   |
