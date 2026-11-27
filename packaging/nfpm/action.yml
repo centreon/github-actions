@@ -30,16 +30,12 @@ inputs:
   commit_hash:
     description: "Commit the packages are built from, written in place of @COMMIT_HASH@"
     required: true
-  stability:
-    description: "Stability of the branch: stable, testing, unstable or canary. Only read with deb_stable_release"
-    required: false
-    default: ""
   deb_release_suffix:
     description: "Distribution suffix of the release of a deb. Default: the one of parse-distrib (+deb12u1, -0ubuntu.24.04)"
     required: false
     default: ""
-  deb_stable_release:
-    description: "Release number forced on a deb when stability is neither unstable nor canary. Default: release is kept"
+  deb_release:
+    description: "Release number of a deb, when it is not the one of an rpm. Default: release"
     required: false
     default: ""
   deb_copyright:
@@ -48,10 +44,6 @@ inputs:
     default: "false"
   placeholders:
     description: "NAME=value lines: @NAME@ is replaced by value in the nfpm configurations"
-    required: false
-    default: ""
-  tree_placeholders:
-    description: "Same lines as placeholders, replaced in every file of the directory of a configuration"
     required: false
     default: ""
   rpm_gpg_key:
@@ -100,12 +92,10 @@ runs:
         INPUT_RELEASE: ${{ inputs.release }}
         INPUT_ARCH: ${{ inputs.arch }}
         COMMIT_HASH: ${{ inputs.commit_hash }}
-        STABILITY: ${{ inputs.stability }}
         DEB_RELEASE_SUFFIX: ${{ inputs.deb_release_suffix }}
-        DEB_STABLE_RELEASE: ${{ inputs.deb_stable_release }}
+        DEB_RELEASE: ${{ inputs.deb_release }}
         DEB_COPYRIGHT: ${{ inputs.deb_copyright }}
         PLACEHOLDERS: ${{ inputs.placeholders }}
-        TREE_PLACEHOLDERS: ${{ inputs.tree_placeholders }}
         RPM_GPG_KEY: ${{ inputs.rpm_gpg_key }}
         RPM_GPG_SIGNING_KEY_ID: ${{ inputs.rpm_gpg_signing_key_id }}
         RPM_GPG_SIGNING_PASSPHRASE: ${{ inputs.rpm_gpg_signing_passphrase }}

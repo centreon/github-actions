@@ -57,10 +57,7 @@ if [[ "$PACKAGE_EXTENSION" == "rpm" ]]; then
   export APACHE_GROUP="apache"
 else
   export DIST=""
-  if [[ -n "${DEB_STABLE_RELEASE:-}" && "${STABILITY:-}" != "unstable" && "${STABILITY:-}" != "canary" ]]; then
-    RELEASE="$DEB_STABLE_RELEASE"
-  fi
-  RELEASE="${RELEASE}${DEB_RELEASE_SUFFIX:-$DISTRIB_SUFFIX}"
+  RELEASE="${DEB_RELEASE:-$RELEASE}${DEB_RELEASE_SUFFIX:-$DISTRIB_SUFFIX}"
   export APACHE_USER="www-data"
   export APACHE_GROUP="www-data"
 fi
@@ -94,7 +91,6 @@ export RPM_SIGNING_KEY_ID="${RPM_GPG_SIGNING_KEY_ID:-}"
 export NFPM_RPM_PASSPHRASE="${RPM_GPG_SIGNING_PASSPHRASE:-}"
 
 PLACEHOLDERS=$(pairs "${PLACEHOLDERS:-}")
-TREE_PLACEHOLDERS=$(pairs "${TREE_PLACEHOLDERS:-}")
 
 # adds the license of the package to a deb, as /usr/share/doc/<package>/copyright
 add_copyright() {
@@ -149,12 +145,6 @@ for file in "${FILES[@]}"; do
   while IFS=$'\t' read -r name value; do
     [[ -n "$name" ]] && substitute "$name" "$value" "$config"
   done <<< "$PLACEHOLDERS"
-  while IFS=$'\t' read -r name value; do
-    [[ -n "$name" ]] || continue
-    while IFS= read -r match; do
-      substitute "$name" "$value" "$match"
-    done < <(grep -rl "@${name}@" . 2> /dev/null || true)
-  done <<< "$TREE_PLACEHOLDERS"
 
   if [[ "$PACKAGE_EXTENSION" == "deb" && "${DEB_COPYRIGHT:-false}" == "true" ]]; then
     add_copyright "$config"

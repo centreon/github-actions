@@ -102,38 +102,38 @@ the step ends. Without `rpm_gpg_signing_key_id` the packages are built unsigned.
 `NEXT_MAJOR_VERSION` follows the versions of Centreon: six months later before 26.10
 (`24.04` then `24.10`), the next month since (`26.10` then `26.11`).
 
-Placeholders are replaced before nfpm runs:
+Placeholders are replaced in the configuration before nfpm runs:
 
-- `@COMMIT_HASH@`, `@APACHE_USER@` and `@APACHE_GROUP@`, in the configuration.
-- The ones of `placeholders`, in the configuration: one `NAME=value` per line replaces
-  `@NAME@`.
-- The ones of `tree_placeholders`, written the same way, in every file of the
-  directory of the configuration (scripts, templates).
+- `@COMMIT_HASH@`, `@APACHE_USER@` and `@APACHE_GROUP@`.
+- The ones of `placeholders`: one `NAME=value` per line replaces `@NAME@`.
 - An `@UPPERCASE@` placeholder left in a configuration fails the step.
+
+Only the configurations are edited. A workflow that needs a value in another file (an
+installation script, a template) writes it there before calling the action.
 
 ### Options
 
-| Input                | Default                | Effect                                                                                              |
-| -------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- |
-| `deb_release_suffix` | From `parse-distrib`   | Distribution suffix of the release of a deb, for example `~bookworm`                                |
-| `deb_stable_release` | empty: release is kept | Release number forced on a deb when `stability` is neither `unstable` nor `canary`                  |
-| `deb_copyright`      | `false`                | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
-| `artifact_name`      | `packages-<distrib>`   | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
+| Input                | Default              | Effect                                                                                              |
+| -------------------- | -------------------- | --------------------------------------------------------------------------------------------------- |
+| `deb_release`        | `release`            | Release number of a deb, when it is not the one of an rpm                                           |
+| `deb_release_suffix` | From `parse-distrib` | Distribution suffix of the release of a deb, for example `~bookworm`                                |
+| `deb_copyright`      | `false`              | Adds `copyright.<license>`, or the `LICENSE.md` of the repository, to a deb as its `copyright` file |
+| `artifact_name`      | `packages-<distrib>` | Name of the uploaded artifact; the default ends with `-<arch>` when `arch` is given                 |
 
 ### Switching from a local copy
 
 The local `package-nfpm` and `package` actions differ between repositories. What gives
 the same packages with this one:
 
-| Local copy                        | Inputs                                                                                                                           | Before the action, in the workflow                                                                  |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| centreon                          | `deb_copyright: "true"`, `tree_placeholders: PHP_MIN_VERSION=<version>`                                                          | Remove the development files; set `PHP_MIN_VERSION` and `PHP_MAX_VERSION`                           |
-| centreon-modules                  | Same, plus `PHP_MODULE_API` in `tree_placeholders` and `placeholders: CENTREON_VERSION=<version>`                                | Remove the development files; set the four `PHP_*` variables                                        |
-| centreon-collect                  | `deb_copyright: "true"`                                                                                                          | Nothing; the Lua version of the `env/.env.<distrib>` files moves to the configuration that reads it |
-| centreon-plugins                  | `version`, `stability` and `deb_stable_release: "1"`                                                                             | Nothing                                                                                             |
-| centreon-stream-connector-scripts | `version`, `deb_release_suffix: "~<distrib>"`, `placeholders` for `luaver` and `VERSION`, `deb_stable_release: "1"` where needed | Read the Lua version                                                                                |
-| centreon-agent                    | `version`                                                                                                                        | Nothing                                                                                             |
+| Local copy                        | Inputs                                                                                                                                                      | Before the action, in the workflow                                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| centreon                          | `deb_copyright: "true"`                                                                                                                                     | Remove the development files; set `PHP_MIN_VERSION` and `PHP_MAX_VERSION`; write the PHP version in the two installation scripts of centreon-web |
+| centreon-modules                  | `deb_copyright: "true"`; for sourceguardian-loader, `placeholders` for `PHP_MIN_VERSION` and `PHP_MODULE_API`                                               | Remove the development files; set the four `PHP_*` variables; write the PHP version in the installation script of sourceguardian-loader          |
+| centreon-collect                  | `deb_copyright: "true"`                                                                                                                                     | Nothing; the Lua version of the `env/.env.<distrib>` files moves to the configuration that reads it                                              |
+| centreon-plugins                  | `version`; `deb_release`: `release` on unstable and canary, `1` otherwise                                                                                   | Nothing                                                                                                                                          |
+| centreon-stream-connector-scripts | `version`, `deb_release_suffix: "~<distrib>"`, `placeholders` for `luaver` and `VERSION`; `deb_release` like centreon-plugins where the release is not kept | Read the Lua version                                                                                                                             |
+| centreon-agent                    | `version`                                                                                                                                                   | Nothing                                                                                                                                          |
 
-No caller passes `package_extension` any more: it is known from `distrib`. The packaging
-of centreon-plugin-packs builds one package per pack from a template and keeps its own
+No caller passes `package_extension` or `stability` any more. The packaging of
+centreon-plugin-packs builds one package per pack from a template and keeps its own
 action.

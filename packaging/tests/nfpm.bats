@@ -107,20 +107,11 @@ refute() {
   [ "$(given web RELEASE)" = "7-0ubuntu.24.04" ]
 }
 
-@test "deb_stable_release replaces the release outside unstable and canary" {
-  package bookworm DEB_STABLE_RELEASE=1 STABILITY=testing
+@test "deb_release replaces the release of a deb only" {
+  package bookworm DEB_RELEASE=1
   [ "$(given web RELEASE)" = "1+deb12u1" ]
   rm -r "${CALLS}/web"
-  package bookworm DEB_STABLE_RELEASE=1 STABILITY=stable
-  [ "$(given web RELEASE)" = "1+deb12u1" ]
-  rm -r "${CALLS}/web"
-  package bookworm DEB_STABLE_RELEASE=1 STABILITY=unstable
-  [ "$(given web RELEASE)" = "7+deb12u1" ]
-  rm -r "${CALLS}/web"
-  package bookworm DEB_STABLE_RELEASE=1 STABILITY=canary
-  [ "$(given web RELEASE)" = "7+deb12u1" ]
-  rm -r "${CALLS}/web"
-  package el9 DEB_STABLE_RELEASE=1 STABILITY=stable
+  package el9 DEB_RELEASE=1
   [ "$(given web RELEASE)" = "7" ]
 }
 
@@ -199,14 +190,6 @@ refute() {
   [ "$status" -eq 0 ]
   grep -q '^lua: "5.4 8.4"$' "${CALLS}/web/config"
   [ "$(cat "${ROOT}/packaging/scripts/postinstall.sh")" = 'php @PHP_MIN_VERSION@' ]
-}
-
-@test "tree placeholders are replaced in every file next to the configuration" {
-  echo 'php @PHP_MIN_VERSION@' > "${ROOT}/outside.sh"
-  package el9 TREE_PLACEHOLDERS="PHP_MIN_VERSION=8.4"
-  [ "$status" -eq 0 ]
-  [ "$(cat "${ROOT}/packaging/scripts/postinstall.sh")" = 'php 8.4' ]
-  [ "$(cat "${ROOT}/outside.sh")" = 'php @PHP_MIN_VERSION@' ]
 }
 
 @test "a placeholder value is written as is, whatever its characters" {
