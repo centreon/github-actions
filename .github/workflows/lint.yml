@@ -113,3 +113,30 @@ jobs:
           [[ "$SOURCE_FILE" == "smoke-test-1.0.0.tar.gz" && -f "$SOURCE_FILE" ]]
           [[ "$DESTINATION" == "s3://centreon-download/public/smoke-test/smoke-test-1.0.0.tar.gz" ]]
           tar tzf "$SOURCE_FILE" | grep -q "^smoke-test-1.0.0/sources-delivery/action.yml$"
+
+  # most callers of the packaging actions run in a container, where paths differ
+  smoke-container:
+    name: smoke (${{ matrix.image }})
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:12", "almalinux:9"]
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Smoke test packaging/parse-distrib in a container
+        id: parse-distrib-smoke
+        uses: $/packaging/parse-distrib
+        with:
+          distrib: el9
+
+      - name: Check the smoke-tested outputs
+        env:
+          PACKAGE_DISTRIB_NAME: ${{ steps.parse-distrib-smoke.outputs.package_distrib_name }}
+          DISTRIB_FAMILY_MAJOR: ${{ steps.parse-distrib-smoke.outputs.distrib_family_major }}
+        run: |
+          [[ "$PACKAGE_DISTRIB_NAME" == "el9" && "$DISTRIB_FAMILY_MAJOR" == "el9" ]]

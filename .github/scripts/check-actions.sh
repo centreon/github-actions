@@ -58,7 +58,7 @@ for action_file in "${action_files[@]}"; do
     elif [[ ! -x "$script_path" ]]; then
       error "$action_file" "script '${script}' is not executable"
     fi
-  done < <(grep -oE 'github\.action_path \}\}/[^[:space:]"]+' "$action_file" | sed 's|^github\.action_path }}/||' | sort -u || true)
+  done < <(grep -oE '(github\.action_path \}\}|GITHUB_ACTION_PATH\}?)/[^[:space:]"'\'']+' "$action_file" | sed -E 's|^[^/]+/||' | sort -u || true)
 done
 
 while IFS= read -r package; do

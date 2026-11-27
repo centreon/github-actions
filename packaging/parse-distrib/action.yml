@@ -42,4 +42,5 @@ runs:
       shell: bash
       env:
         DISTRIB: ${{ inputs.distrib }}
-      run: ${{ github.action_path }}/parse-distrib.sh
+      # the variable, not the context: only the variable is right in a container job
+      run: '"${GITHUB_ACTION_PATH}/parse-distrib.sh"'

@@ -96,6 +96,16 @@ action() {
   [[ "$output" == *"script 'missing.sh' does not exist"* ]]
 }
 
+@test "a script called through the GITHUB_ACTION_PATH variable is checked too" {
+  action 'run: "${GITHUB_ACTION_PATH}/../lib/run.sh"'
+  run "$SCRIPT" "$REPO"
+  [ "$status" -eq 0 ]
+  action 'run: "${GITHUB_ACTION_PATH}/missing.sh"'
+  run "$SCRIPT" "$REPO"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"script 'missing.sh' does not exist"* ]]
+}
+
 @test "a script that is not executable fails" {
   chmod -x "${REPO}/tool/lib/run.sh"
   run "$SCRIPT" "$REPO"
